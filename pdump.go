@@ -22,8 +22,8 @@ func pdump(data []byte) {
 		line.WriteString(fmt.Sprintf("%08x: ", lineBase))
 		ascii.WriteRune('|')
 
-		for pos := lineBase; pos < lineBase + 16; pos++ {
-			if pos < offset || pos >= offset + length {
+		for pos := lineBase; pos < lineBase+16; pos++ {
+			if pos < offset || pos >= offset+length {
 				line.WriteString("   ")
 				ascii.WriteRune(' ')
 			} else {

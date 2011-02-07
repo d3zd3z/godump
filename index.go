@@ -31,25 +31,25 @@ func (idx MemoryIndex) Lookup(oid OID) (offset int, present bool) {
 }
 
 type sortMap struct {
-	oids []byte
+	oids    []byte
 	offsets []int
 }
 
 func (items *sortMap) Len() int { return len(items.offsets) }
 func (items *sortMap) Less(i, j int) bool {
-	ibase := 20*i
-	ia := items.oids[ibase:ibase+20]
-	jbase := 20*j
-	ja := items.oids[jbase:jbase+20]
+	ibase := 20 * i
+	ia := items.oids[ibase : ibase+20]
+	jbase := 20 * j
+	ja := items.oids[jbase : jbase+20]
 	return bytes.Compare(ia, ja) < 0
 }
 func (items *sortMap) Swap(i, j int) {
 	items.offsets[i], items.offsets[j] = items.offsets[j], items.offsets[i]
 
-	ibase := 20*i
-	ia := items.oids[ibase:ibase+20]
-	jbase := 20*j
-	ja := items.oids[jbase:jbase+20]
+	ibase := 20 * i
+	ia := items.oids[ibase : ibase+20]
+	jbase := 20 * j
+	ja := items.oids[jbase : jbase+20]
 
 	tmp := make([]byte, 20)
 	copy(tmp, ia)
@@ -83,8 +83,10 @@ func (idx MemoryIndex) writeIndex(path string, poolSize uint32) (err os.Error) {
 	sort.Sort(&items)
 
 	// TODO: Write to temp, and rename.
-	fd, err := os.Open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0644)
-	if err != nil { return }
+	fd, err := os.Open(path, os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0644)
+	if err != nil {
+		return
+	}
 	defer fd.Close()
 
 	var header bytes.Buffer
@@ -92,7 +94,9 @@ func (idx MemoryIndex) writeIndex(path string, poolSize uint32) (err os.Error) {
 	writeLE32(&header, 2)
 	writeLE32(&header, poolSize)
 	_, err = header.WriteTo(fd)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 
 	// The top-level index is the offsets of the ranges for the
 	// search.
@@ -106,10 +110,14 @@ func (idx MemoryIndex) writeIndex(path string, poolSize uint32) (err os.Error) {
 		writeLE32(&top, uint32(offset))
 	}
 	_, err = top.WriteTo(fd)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 
 	_, err = fd.Write(items.oids)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 
 	// Lastly, write the offset table.
 	var otable bytes.Buffer
@@ -117,7 +125,9 @@ func (idx MemoryIndex) writeIndex(path string, poolSize uint32) (err os.Error) {
 		writeLE32(&otable, uint32(offset))
 	}
 	_, err = otable.WriteTo(fd)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 
 	return
 }
@@ -129,8 +139,8 @@ const hexDigits = "0123456789abcdef"
 func (item OID) String() string {
 	var result [40]byte
 	for i, ch := range ([]byte)(item) {
-		result[2*i] = hexDigits[ch >> 4]
-		result[2*i+1] = hexDigits[ch & 0x0f]
+		result[2*i] = hexDigits[ch>>4]
+		result[2*i+1] = hexDigits[ch&0x0f]
 	}
 
 	return string(result[:])
@@ -155,13 +165,21 @@ func main() {
 	for i := 1; i < limit; i++ {
 		oid := intHash(i)
 		index, present := table.Lookup(oid)
-		if !present { panic("Missing") }
-		if index != i { panic("Wrong") }
+		if !present {
+			panic("Missing")
+		}
+		if index != i {
+			panic("Wrong")
+		}
 		oid[19] ^= 1
 		_, present = table.Lookup(oid)
-		if present { panic("Present") }
+		if present {
+			panic("Present")
+		}
 	}
 
 	err := table.writeIndex("test.idx", 0x12345678)
-	if err != nil { panic(err) }
+	if err != nil {
+		panic(err)
+	}
 }
