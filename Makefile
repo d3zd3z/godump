@@ -3,7 +3,9 @@
 include $(GOROOT)/src/Make.inc
 
 TARG = godump
-GOFILES := chunk.go index.go index-file.go index-ram.go pdump.go
+GOFILES := chunk.go index.go index-file.go index-ram.go \
+	pool.go \
+	pdump.go
 
 # The OpenSSL sha1 library is about 4.5 times faster on my machine,
 # but using it is more complex, and has complicated licensing

@@ -94,6 +94,7 @@ func WriteIndex(idx QueryIndexer, path string, poolSize uint32) (err os.Error) {
 		return
 	}
 
+	fd.Sync()
 	fd.Close()
 	err = os.Rename(tmpPath, path)
 
