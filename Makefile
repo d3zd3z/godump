@@ -20,3 +20,10 @@ endif
 endif
 
 include $(GOROOT)/src/Make.cmd
+
+GCCGO = /usr/local/gccgo/bin/gccgo
+
+# Build the gcc one for testing.
+gccgodump: $(GOFILES)
+	$(GCCGO) -O2 -c -o _go_.o $(GOFILES)
+	$(GCCGO) -o gccgodump _go_.o
