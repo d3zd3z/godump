@@ -28,9 +28,9 @@ type FullIndexer interface {
 }
 
 type IndexHeader struct {
-	magic    [8]byte
-	version  uint32
-	poolSize uint32
+	Magic    [8]byte
+	Version  uint32
+	PoolSize uint32
 }
 
 func WriteIndex(idx QueryIndexer, path string, poolSize uint32) (err os.Error) {
@@ -56,9 +56,9 @@ func WriteIndex(idx QueryIndexer, path string, poolSize uint32) (err os.Error) {
 	defer fd.Close()
 
 	var header IndexHeader
-	copy(header.magic[:], "ldumpidx")
-	header.version = 2
-	header.poolSize = poolSize
+	copy(header.Magic[:], "ldumpidx")
+	header.Version = 2
+	header.PoolSize = poolSize
 	err = binary.Write(fd, binary.LittleEndian, &header)
 	if err != nil {
 		return
