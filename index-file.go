@@ -4,7 +4,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 )
@@ -57,6 +56,14 @@ func (fi *FileIndex) Lookup(oid OID) (offset uint32, present bool) {
 		}
 	}
 	return
+}
+
+func (fi *FileIndex) Len() int {
+	return int(fi.GetTop(255))
+}
+
+func (fi *FileIndex) ForEach(f func(oid OID, offset uint32)) {
+	panic("Not implemented")
 }
 
 var bigEndian = false
@@ -114,7 +121,6 @@ func readFileIndex(path string, poolSize uint32) (index *FileIndex, err os.Error
 	}
 
 	size := int(result.GetTop(255))
-	fmt.Printf("Count: %d\n", size)
 
 	result.oids = make([]byte, 20*size)
 	_, err = io.ReadFull(fd, result.oids)

@@ -12,19 +12,15 @@ import (
 	"strconv"
 )
 
-type Indexer interface {
+type ReadIndexer interface {
 	Lookup(oid OID) (offset uint32, present bool)
-	Add(oid OID, offset uint32)
-}
-
-type QueryIndexer interface {
-	ForEach(f func(oid OID, offset uint32))
 	Len() int
+	ForEach(f func(oid OID, offset uint32))
 }
 
-type FullIndexer interface {
-	Indexer
-	QueryIndexer
+type Indexer interface {
+	ReadIndexer
+	Add(oid OID, offset uint32)
 }
 
 type IndexHeader struct {
@@ -33,7 +29,7 @@ type IndexHeader struct {
 	poolSize uint32
 }
 
-func WriteIndex(idx QueryIndexer, path string, poolSize uint32) (err os.Error) {
+func WriteIndex(idx ReadIndexer, path string, poolSize uint32) (err os.Error) {
 	size := idx.Len()
 
 	oids := make([]byte, 20*size)

@@ -3,7 +3,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -43,24 +42,31 @@ func reIndexFile(pool string, index string) (err os.Error) {
 	return
 }
 
-func openPoolFile(base string, fi *os.FileInfo) {
-	log.Printf("Pool file %x\n", fi.Size)
+type PoolFile struct {
+	index ReadIndexer
+}
+
+func openPoolFile(base string, fi *os.FileInfo) (pf *PoolFile, err os.Error) {
+	// log.Printf("Pool file %x\n", fi.Size)
 	if fi.Size > 0x7FFFFFFF {
 		panic("Pool file > 2GB")
 	}
 	size := uint32(fi.Size)
 	indexPath := base + "/" + fi.Name[:len(fi.Name)-5] + ".idx"
-	_, err := readFileIndex(indexPath, size)
+	index, err := readFileIndex(indexPath, size)
 	if err != nil {
 		err = reIndexFile(base+"/"+fi.Name, indexPath)
 		if err != nil {
 			log.Fatalf("Index file doesn't match pool file: %s (%v)", indexPath, err)
 		}
-		_, err = readFileIndex(indexPath, size)
+		index, err = readFileIndex(indexPath, size)
 	}
 	if err != nil {
 		log.Fatalf("Unable to regenerate index: %s (%v)", indexPath, err)
 	}
+
+	pf = &PoolFile{index}
+	return
 }
 
 func poolMain() {
@@ -69,10 +75,15 @@ func poolMain() {
 	if err != nil {
 		panic(err)
 	}
+	count := 0
 	for _, fi := range names {
 		if strings.HasSuffix(fi.Name, ".data") {
-			fmt.Printf("name: %s\n", fi.Name)
-			openPoolFile(base, fi)
+			pf, err := openPoolFile(base, fi)
+			if err != nil {
+				log.Fatalf("Unable to open pool file: %s/%s", base, fi.Name)
+			}
+			count += pf.index.Len()
 		}
 	}
+	log.Printf("%d objects present", count)
 }

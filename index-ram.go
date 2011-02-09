@@ -80,7 +80,7 @@ func (r *RamIndex) Len() int {
 	return len(r.offsets)
 }
 
-func NewRamIndex() FullIndexer {
+func NewRamIndex() Indexer {
 	var ri RamIndex
 	return &ri
 }
