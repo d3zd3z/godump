@@ -39,7 +39,7 @@ func (fi *FileIndex) Lookup(oid OID) (offset uint32, present bool) {
 	if topByte > 0 {
 		low = int(fi.GetTop(topByte - 1))
 	}
-	high := int(fi.GetTop(topByte))
+	high := int(fi.GetTop(topByte)) - 1
 
 	// Binary search.
 	for high >= low {
@@ -138,7 +138,7 @@ func indexFileMain() {
 		panic(err)
 	}
 
-	const limit = 100000
+	const limit = 1000000
 	for i := 0; i < limit; i++ {
 		oid := intHash(i)
 		index, present := table.Lookup(oid)

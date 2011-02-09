@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"fmt"
+	"log"
 	"io"
 	"os"
 	"sort"
@@ -273,10 +274,11 @@ func intHash(index int) (oid OID) {
 }
 
 func index_main() {
-	table := NewMemoryIndex()
+	// table := NewMemoryIndex()
 	// table := newHashMemoryIndex()
+	table := NewRamIndex()
 
-	limit := 1000000
+	const limit = 100000
 	for i := 0; i < limit; i++ {
 		oid := intHash(i)
 		// fmt.Printf("Add %x -> %d\n", []byte(oid), i)
@@ -290,7 +292,7 @@ func index_main() {
 		oid := intHash(i)
 		index, present := table.Lookup(oid)
 		if !present {
-			panic("Missing")
+			log.Panicf("Missing: %d", i)
 		}
 		if index != uint32(i) {
 			panic("Wrong")
