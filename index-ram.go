@@ -63,7 +63,24 @@ func (r *RamIndex) Lookup(oid OID) (offset uint32, present bool) {
 	return
 }
 
-func NewRamIndex() Indexer {
+// Call the function for each node in the index, visiting them in
+// lexicographical order.
+func (r *RamIndex) ForEach(f func(oid OID, offset uint32)) {
+	oids := r.oids.Bytes()
+	for base := 0; base < 256; base++ {
+		index := r.index[base]
+		for _, num := range index {
+			tmp := num * 20
+			f(OID(oids[tmp:tmp+20]), r.offsets[num])
+		}
+	}
+}
+
+func (r *RamIndex) Len() int {
+	return len(r.offsets)
+}
+
+func NewRamIndex() FullIndexer {
 	var ri RamIndex
 	return &ri
 }
