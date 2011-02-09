@@ -48,8 +48,9 @@ func WriteIndex(idx QueryIndexer, path string, poolSize uint32) (err os.Error) {
 		ibase++
 	})
 
-	// TODO: Write to temp, and rename.
-	fd, err := os.Open(path, os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0644)
+	tmpPath := path + ".tmp"
+
+	fd, err := os.Open(tmpPath, os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0644)
 	if err != nil {
 		return
 	}
@@ -92,6 +93,9 @@ func WriteIndex(idx QueryIndexer, path string, poolSize uint32) (err os.Error) {
 	if err != nil {
 		return
 	}
+
+	fd.Close()
+	err = os.Rename(tmpPath, path)
 
 	return
 }
