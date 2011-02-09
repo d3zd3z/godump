@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha1"
+	"encoding/binary"
 	"log"
 	"io"
 	"os"
@@ -26,11 +27,10 @@ type FullIndexer interface {
 	QueryIndexer
 }
 
-func writeLE32(buf *bytes.Buffer, item uint32) {
-	buf.WriteByte(byte(item))
-	buf.WriteByte(byte(item >> 8))
-	buf.WriteByte(byte(item >> 16))
-	buf.WriteByte(byte(item >> 24))
+type IndexHeader struct {
+	magic    [8]byte
+	version  uint32
+	poolSize uint32
 }
 
 func WriteIndex(idx QueryIndexer, path string, poolSize uint32) (err os.Error) {
@@ -55,11 +55,11 @@ func WriteIndex(idx QueryIndexer, path string, poolSize uint32) (err os.Error) {
 	}
 	defer fd.Close()
 
-	var header bytes.Buffer
-	header.WriteString("ldumpidx")
-	writeLE32(&header, 2)
-	writeLE32(&header, poolSize)
-	_, err = header.WriteTo(fd)
+	var header IndexHeader
+	copy(header.magic[:], "ldumpidx")
+	header.version = 2
+	header.poolSize = poolSize
+	err = binary.Write(fd, binary.LittleEndian, &header)
 	if err != nil {
 		return
 	}
@@ -73,7 +73,7 @@ func WriteIndex(idx QueryIndexer, path string, poolSize uint32) (err os.Error) {
 		for offset < size && byte(first) >= oids[20*offset] {
 			offset++
 		}
-		writeLE32(&top, uint32(offset))
+		binary.Write(&top, binary.LittleEndian, uint32(offset))
 	}
 	_, err = top.WriteTo(fd)
 	if err != nil {
@@ -87,9 +87,7 @@ func WriteIndex(idx QueryIndexer, path string, poolSize uint32) (err os.Error) {
 
 	// Lastly, write the offset table.
 	var otable bytes.Buffer
-	for _, offset := range offsets {
-		writeLE32(&otable, uint32(offset))
-	}
+	binary.Write(&otable, binary.LittleEndian, offsets)
 	_, err = otable.WriteTo(fd)
 	if err != nil {
 		return
