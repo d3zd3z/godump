@@ -5,34 +5,149 @@ package main
 import (
 	"bytes"
 	"crypto/sha1"
+	"fmt"
 	"io"
 	"os"
 	"sort"
 	"strconv"
 )
 
+// In-memory maps from hashes to keys.
+
+// Extract a numbered nibble from an oid.
+func getNibble(oid OID, index int) int {
+	num := oid[index>>1]
+	if (index & 1) == 0 {
+		num >>= 4
+	}
+	return int(num & 0x0f)
+}
+
+type Hasher interface {
+	Lookup(oid OID, index int) (offset uint32, present bool)
+	Add(oid OID, index int, offset uint32) Hasher
+	Show(level int)
+}
+
+type trieNode [16]Hasher
+
+type trieLeaf struct {
+	oid    OID
+	offset uint32
+}
+
+type trieEmpty int
+
+var emptyCell = new(trieEmpty)
+
+func (node *trieEmpty) Lookup(oid OID, index int) (offset uint32, present bool) { return }
+func (node *trieLeaf) Lookup(oid OID, index int) (offset uint32, present bool) {
+	if node.oid.Compare(oid) == 0 {
+		offset = node.offset
+		present = true
+	}
+	return
+}
+func (node *trieNode) Lookup(oid OID, index int) (offset uint32, present bool) {
+	offset, present = node[getNibble(oid, index)].Lookup(oid, index+1)
+	return
+}
+
+// The Add method returns the new node, which might be a new type if it has to be split.
+func (node *trieEmpty) Add(oid OID, index int, offset uint32) Hasher {
+	return &trieLeaf{oid, offset}
+}
+
+func (node *trieLeaf) Add(oid OID, index int, offset uint32) Hasher {
+	if node.oid.Compare(oid) == 0 {
+		panic("Duplicate add")
+	}
+	var child trieNode
+	for i := 0; i < 16; i++ {
+		child[i] = emptyCell
+	}
+
+	child[getNibble(node.oid, index)] = node
+	return child.Add(oid, index, offset)
+}
+
+func (node *trieNode) Add(oid OID, index int, offset uint32) Hasher {
+	piece := getNibble(oid, index)
+	node[piece] = node[piece].Add(oid, index+1, offset)
+	return node
+}
+
+type MemoryIndex struct {
+	box Hasher
+}
+
+func NewMemoryIndex() Indexer {
+	var mi MemoryIndex
+	InitMemoryIndex(&mi)
+	return &mi
+}
+
+func InitMemoryIndex(mi *MemoryIndex) {
+	mi.box = emptyCell
+}
+
+func (mi *MemoryIndex) Add(oid OID, offset uint32) {
+	mi.box = mi.box.Add(oid, 0, offset)
+}
+
+func (mi *MemoryIndex) Lookup(oid OID) (offset uint32, present bool) {
+	offset, present = mi.box.Lookup(oid, 0)
+	return
+}
+
+func (mi *MemoryIndex) Show() {
+	mi.box.Show(0)
+}
+
+func (node *trieEmpty) Show(level int) {
+	fmt.Printf("%*s\u03d5\n", 2*level, "")
+}
+func (node *trieLeaf) Show(level int) {
+	fmt.Printf("%*sleaf: %x -> %d\n", 2*level, "", []byte(node.oid), node.offset)
+}
+func (node *trieNode) Show(level int) {
+	fmt.Printf("%*snode\n", 2*level, "")
+	for i := 0; i < 16; i++ {
+		node[i].Show(level + 1)
+	}
+}
+
+type Indexer interface {
+	Lookup(oid OID) (offset uint32, present bool)
+	Add(oid OID, offset uint32)
+}
+
 // As a special hack, store the offsets using a map, with the OID keys
 // as strings.  There are lots of copies of the 20-byte OIDs to make
 // the strings, but it saves us from having to write the map itself.
 
-type MemoryIndex map[string]int
+// This seems rather inefficient, so we'll try to come up with
+// something better, preferrably that keeps the data sorted, knows
+// that the data won't have deletes.
 
-func newMemoryIndex() MemoryIndex {
-	return make(map[string]int)
+type HashMemoryIndex map[string]uint32
+
+func newHashMemoryIndex() HashMemoryIndex {
+	return make(map[string]uint32)
 }
 
-func (idx MemoryIndex) Add(oid OID, offset int) {
+func (idx HashMemoryIndex) Add(oid OID, offset uint32) {
 	idx[string([]byte(oid))] = offset
 }
 
-func (idx MemoryIndex) Lookup(oid OID) (offset int, present bool) {
+func (idx HashMemoryIndex) Lookup(oid OID) (offset uint32, present bool) {
 	offset, present = idx[string([]byte(oid))]
 	return
 }
 
 type sortMap struct {
 	oids    []byte
-	offsets []int
+	offsets []uint32
 }
 
 func (items *sortMap) Len() int { return len(items.offsets) }
@@ -64,12 +179,12 @@ func writeLE32(buf *bytes.Buffer, item uint32) {
 	buf.WriteByte(byte(item >> 24))
 }
 
-func (idx MemoryIndex) writeIndex(path string, poolSize uint32) (err os.Error) {
+func (idx HashMemoryIndex) writeIndex(path string, poolSize uint32) (err os.Error) {
 	var items sortMap
 	size := len(idx)
 
 	items.oids = make([]byte, 20*size)
-	items.offsets = make([]int, size)
+	items.offsets = make([]uint32, size)
 
 	base := 0
 	ibase := 0
@@ -146,6 +261,10 @@ func (item OID) String() string {
 	return string(result[:])
 }
 
+func (me OID) Compare(other OID) int {
+	return bytes.Compare([]byte(me), []byte(other))
+}
+
 func intHash(index int) (oid OID) {
 	hash := sha1.New()
 	io.WriteString(hash, "blob")
@@ -153,22 +272,27 @@ func intHash(index int) (oid OID) {
 	return OID(hash.Sum())
 }
 
-func main() {
-	table := newMemoryIndex()
+func index_main() {
+	table := NewMemoryIndex()
+	// table := newHashMemoryIndex()
 
-	limit := 100000
-	for i := 1; i < limit; i++ {
+	limit := 1000000
+	for i := 0; i < limit; i++ {
 		oid := intHash(i)
-		table.Add(oid, i)
+		// fmt.Printf("Add %x -> %d\n", []byte(oid), i)
+		table.Add(oid, uint32(i))
 	}
+
+	// table.Show()
+
 	// Test that we can find them all.
-	for i := 1; i < limit; i++ {
+	for i := 0; i < limit; i++ {
 		oid := intHash(i)
 		index, present := table.Lookup(oid)
 		if !present {
 			panic("Missing")
 		}
-		if index != i {
+		if index != uint32(i) {
 			panic("Wrong")
 		}
 		oid[19] ^= 1
@@ -178,8 +302,10 @@ func main() {
 		}
 	}
 
-	err := table.writeIndex("test.idx", 0x12345678)
-	if err != nil {
-		panic(err)
-	}
+	/*
+		err := table.writeIndex("test.idx", 0x12345678)
+		if err != nil {
+			panic(err)
+		}
+	*/
 }
