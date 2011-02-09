@@ -4,7 +4,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -13,9 +12,14 @@ import (
 // Reads the index file written by MemoryIndex.writeIndex
 
 type FileIndex struct {
-	top     []uint32
+	top     []byte
 	oids    []byte
-	offsets []uint32
+	offsets []byte
+}
+
+func (fi *FileIndex) GetTop(i int) uint32 {
+	tmp := i << 2
+	return readLE32(fi.top[tmp : tmp+4])
 }
 
 func (fi *FileIndex) GetOID(i int) []byte {
@@ -23,14 +27,19 @@ func (fi *FileIndex) GetOID(i int) []byte {
 	return fi.oids[tmp : tmp+20]
 }
 
+func (fi *FileIndex) GetOffset(i int) uint32 {
+	tmp := i << 2
+	return readLE32(fi.offsets[tmp : tmp+4])
+}
+
 func (fi *FileIndex) Lookup(oid OID) (offset uint32, present bool) {
 	rawOid := []byte(oid)
 	low := 0
 	topByte := int(rawOid[0])
 	if topByte > 0 {
-		low = int(fi.top[topByte-1])
+		low = int(fi.GetTop(topByte - 1))
 	}
-	high := int(fi.top[topByte]) - 1
+	high := int(fi.GetTop(topByte)) - 1
 
 	// Binary search.
 	for high >= low {
@@ -42,12 +51,24 @@ func (fi *FileIndex) Lookup(oid OID) (offset uint32, present bool) {
 		case v < 0:
 			low = mid + 1
 		default:
-			offset = fi.offsets[mid]
+			offset = fi.GetOffset(mid)
 			present = true
 			return
 		}
 	}
 	return
+}
+
+var bigEndian = false
+
+func toLittle(value uint32) uint32 {
+	if bigEndian {
+		return ((value >> 24) |
+			((value >> 16) & 0xFF00) |
+			((value & 0xFF00) << 16) |
+			((value & 0xFF) << 24))
+	}
+	return value
 }
 
 // TODO: Handling these better?
@@ -64,35 +85,35 @@ func readFileIndex(path string, poolSize uint32) (index *FileIndex, err os.Error
 	}
 	defer fd.Close()
 
-	var header IndexHeader
-	err = binary.Read(fd, binary.LittleEndian, &header)
+	rawHeader := make([]byte, 16)
+	_, err = io.ReadFull(fd, rawHeader)
 	if err != nil {
 		return
 	}
 
-	if string(header.Magic[:]) != "ldumpidx" {
+	if string(rawHeader[0:8]) != "ldumpidx" {
 		err = IndexError("Invalid magic header")
 		return
 	}
 
-	if header.Version != 2 {
+	if readLE32(rawHeader[8:12]) != 2 {
 		err = IndexError("Unsupported index version")
 		return
 	}
 
-	if header.PoolSize != poolSize {
+	if readLE32(rawHeader[12:16]) != poolSize {
 		err = IndexError("Index mismatch with pool file size")
 		return
 	}
 
 	var result FileIndex
-	result.top = make([]uint32, 256)
-	err = binary.Read(fd, binary.LittleEndian, result.top)
+	result.top = make([]byte, 1024)
+	_, err = io.ReadFull(fd, result.top)
 	if err != nil {
 		return
 	}
 
-	size := int(result.top[255])
+	size := int(result.GetTop(255))
 	fmt.Printf("Count: %d\n", size)
 
 	result.oids = make([]byte, 20*size)
@@ -101,8 +122,8 @@ func readFileIndex(path string, poolSize uint32) (index *FileIndex, err os.Error
 		return
 	}
 
-	result.offsets = make([]uint32, size)
-	err = binary.Read(fd, binary.LittleEndian, result.offsets)
+	result.offsets = make([]byte, 4*size)
+	_, err = io.ReadFull(fd, result.offsets)
 	if err != nil {
 		return
 	}
