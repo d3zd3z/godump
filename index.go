@@ -1,15 +1,12 @@
 // Index mapping hashes to file offsets.
 
-package main
+package pool
 
 import (
 	"bytes"
-	"crypto/sha1"
 	"encoding/binary"
 	"log"
-	"io"
 	"os"
-	"strconv"
 )
 
 type ReadIndexer interface {
@@ -27,6 +24,30 @@ type IndexHeader struct {
 	magic    [8]byte
 	version  uint32
 	poolSize uint32
+}
+
+// A multi-index is simply a set of indexes that is each searched.  Foreach combines them in order.
+type MultiIndex []ReadIndexer
+
+func (mi MultiIndex) Lookup(oid OID) (offset uint32, present bool) {
+	for _, ind := range mi {
+		offset, present = ind.Lookup(oid)
+		if present {
+			return
+		}
+	}
+	return
+}
+
+func (mi MultiIndex) Len() (length int) {
+	for _, ind := range mi {
+		length += ind.Len()
+	}
+	return
+}
+
+func (mi MultiIndex) ForEach(f func(oid OID, offset uint32)) {
+	panic("TODO")
 }
 
 func WriteIndex(idx ReadIndexer, path string, poolSize uint32) (err os.Error) {
@@ -95,31 +116,6 @@ func WriteIndex(idx ReadIndexer, path string, poolSize uint32) (err os.Error) {
 	err = os.Rename(tmpPath, path)
 
 	return
-}
-
-type OID []byte
-
-const hexDigits = "0123456789abcdef"
-
-func (item OID) String() string {
-	var result [40]byte
-	for i, ch := range ([]byte)(item) {
-		result[2*i] = hexDigits[ch>>4]
-		result[2*i+1] = hexDigits[ch&0x0f]
-	}
-
-	return string(result[:])
-}
-
-func (me OID) Compare(other OID) int {
-	return bytes.Compare([]byte(me), []byte(other))
-}
-
-func intHash(index int) (oid OID) {
-	hash := sha1.New()
-	io.WriteString(hash, "blob")
-	io.WriteString(hash, strconv.Itoa(index))
-	return OID(hash.Sum())
 }
 
 func index_main() {

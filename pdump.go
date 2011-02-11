@@ -1,6 +1,6 @@
 // Dump bytes as ascii.
 
-package main
+package pdump
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-func pdump(data []byte) {
+func Dump(data []byte) {
 	var line bytes.Buffer
 	var ascii bytes.Buffer
 

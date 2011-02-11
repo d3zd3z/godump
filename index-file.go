@@ -1,6 +1,6 @@
 // File index.
 
-package main
+package pool
 
 import (
 	"bytes"
@@ -161,10 +161,4 @@ func indexFileMain() {
 			panic("Present")
 		}
 	}
-}
-
-func main() {
-	// index_main()
-	// indexFileMain()
-	poolMain()
 }

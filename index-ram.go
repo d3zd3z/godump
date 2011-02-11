@@ -2,7 +2,7 @@
 // is actually slightly slower than hash tables (depending on the key
 // size), but uses significantly less memory.
 
-package main
+package pool
 
 import (
 	"bytes"

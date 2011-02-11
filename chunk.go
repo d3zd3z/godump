@@ -1,6 +1,6 @@
 // Backup chunks.
 
-package main
+package pool
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 
 type Chunk interface {
 	Kind() []byte
-	OID() []byte
+	OID() OID
 	Data() []byte
 	DataLen() uint32
 	ZData() (zdata []byte, present bool)
@@ -31,11 +31,11 @@ func readLE32(piece []byte) uint32 {
 
 type sharedChunk struct {
 	kind []byte
-	oid  []byte
+	oid  OID
 }
 
 func (ch *sharedChunk) Kind() []byte { return ch.kind }
-func (ch *sharedChunk) OID() []byte  { return ch.oid }
+func (ch *sharedChunk) OID() OID  { return ch.oid }
 
 type compressedChunk struct {
 	sharedChunk
