@@ -1,3 +1,2 @@
-*.6
-_*
-godump
+obj/*.[568]
+bin/godump
