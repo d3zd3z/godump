@@ -10,22 +10,32 @@ GCFLAGS = -Iobj
 
 all: bin/godump
 
-bin/godump: obj/godump.$(ARCH) obj/pdump.$(ARCH) obj/pool.$(ARCH) | bin
-	$(LD) -o $@ -L obj obj/godump.$(ARCH)
+PDUMP_SRC := $(wildcard pdump/*.go)
+PDUMP_OBJ := obj/pdump.$(ARCH)
+$(PDUMP_OBJ): $(PDUMP_SRC) | obj
+	$(GC) $(GCFLAGS) -o $@ $(PDUMP_SRC)
 
-PDUMP := $(wildcard pdump/*.go)
-obj/pdump.$(ARCH): $(PDUMP) | obj
-	$(GC) $(GCFLAGS) -o $@ $^
+POOL_SRC := $(wildcard pool/*.go)
+POOL_OBJ := obj/pool.$(ARCH)
+$(POOL_OBJ): $(POOL_SRC) | obj
+	$(GC) $(GCFLAGS) -o $@ $(POOL_SRC)
 
-POOL := $(wildcard pool/*.go)
-obj/pool.$(ARCH): $(POOL) | obj
-	$(GC) $(GCFLAGS) -o $@ $^
+GODUMP_SRC := $(wildcard godump/*.go)
+GODUMP_OBJ := obj/godump.$(ARCH)
+$(GODUMP_OBJ): $(GODUMP_SRC) | obj
+	$(GC) $(GCFLAGS) -o $@ $(GODUMP_SRC)
 
-GODUMP := $(wildcard godump/*.go)
-obj/godump.$(ARCH): $(GODUMP) | obj
-	$(GC) $(GCFLAGS) -o $@ $^
+# Package dependencies
+$(POOL_OBJ): $(PDUMP_OBJ)
+$(GODUMP_OBJ): $(POOL_OBJ)
+
+bin/godump: $(GODUMP_OBJ) | bin
+	$(LD) -o $@ -L obj $(GODUMP_OBJ)
 
 obj:
 	mkdir $@
 bin:
 	mkdir $@
+
+clean:
+	rm -rf obj bin
