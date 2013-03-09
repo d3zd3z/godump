@@ -1,4 +1,7 @@
 # Ugh.
+# Make has always been, and still is an abomination.
+
+# TODO Find something that's actually _better_ than make, not just different.
 
 # What to build for.
 ARCH = 6
