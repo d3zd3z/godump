@@ -4,6 +4,7 @@
 
 package pool
 
+/*
 import (
 	"bytes"
 	"sort"
@@ -84,3 +85,4 @@ func NewRamIndex() Indexer {
 	var ri RamIndex
 	return &ri
 }
+*/

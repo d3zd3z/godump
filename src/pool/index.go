@@ -2,6 +2,7 @@
 
 package pool
 
+/*
 import (
 	"bytes"
 	"encoding/binary"
@@ -154,3 +155,4 @@ func index_main() {
 		panic(err)
 	}
 }
+*/

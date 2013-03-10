@@ -5,10 +5,15 @@ package pdump
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 )
 
 func Dump(data []byte) {
+	DumpTo(data, os.Stdout)
+}
+
+func DumpTo(data []byte, out io.Writer) {
 	var line bytes.Buffer
 	var ascii bytes.Buffer
 
@@ -30,7 +35,7 @@ func Dump(data []byte) {
 				ch := data[pos]
 				line.WriteString(fmt.Sprintf("%02x ", ch))
 				if ch >= 32 && ch <= 126 {
-					ascii.WriteRune(int(ch))
+					ascii.WriteRune(rune(ch))
 				} else {
 					ascii.WriteRune('.')
 				}
@@ -44,8 +49,8 @@ func Dump(data []byte) {
 
 		line.WriteRune(' ')
 		ascii.WriteRune('\n')
-		line.WriteTo(os.Stdout)
-		ascii.WriteTo(os.Stdout)
+		line.WriteTo(out)
+		ascii.WriteTo(out)
 
 		oldOffset := offset
 		offset = (offset + 16) &^ 15

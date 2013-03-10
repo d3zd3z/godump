@@ -2,6 +2,7 @@
 
 package pool
 
+/*
 import (
 	"bytes"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"os"
 	"pdump"
 	"strings"
-	"xml"
 )
 
 // Regenerate the index for the given file.
@@ -237,3 +237,4 @@ func (p *Node) Map() map[string]string {
 	}
 	return p.props
 }
+*/

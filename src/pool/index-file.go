@@ -2,6 +2,7 @@
 
 package pool
 
+/*
 import (
 	"bytes"
 	"io"
@@ -162,3 +163,4 @@ func indexFileMain() {
 		}
 	}
 }
+*/
