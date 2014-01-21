@@ -1,2 +1,4 @@
 obj/*.[568]
 bin/godump
+tags
+pkg/
