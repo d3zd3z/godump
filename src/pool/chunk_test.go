@@ -1,15 +1,19 @@
 package pool_test
 
-import "bytes"
-import "compress/zlib"
-import "crypto/rand"
-import "encoding/base64"
-import "errors"
-import "fmt"
-import "io"
-import "testing"
-import "pool"
-import "os"
+import (
+	"bytes"
+	"compress/zlib"
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"testing"
+
+	"pdump"
+	"pool"
+)
 
 func TestChunkSanity(t *testing.T) {
 	for _, size := range makeSizes() {
@@ -36,12 +40,13 @@ func TestChunkSanity(t *testing.T) {
 	}
 }
 
-func testChunkIO(t *testing.T) {
+func TestChunkIO(t *testing.T) {
 	for _, size := range makeSizes() {
 		c := pool.MakeRandomChunk(size)
 		var buf bytes.Buffer
 		pool.ChunkWrite(c, &buf)
 
+		pdump.Dump(buf.Bytes())
 		c2, pad, err := pool.ChunkRead(&buf)
 		if err != nil {
 			t.Errorf("Can't read chunk '%s'", err)
@@ -58,7 +63,7 @@ func testChunkIO(t *testing.T) {
 			}
 		}
 
-		if !bytes.Equal(c.Kind(), c2.Kind()) {
+		if c.Kind() != c2.Kind() {
 			t.Error("Read kind is incorrect")
 		}
 

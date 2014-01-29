@@ -11,7 +11,7 @@ import (
 )
 
 type Chunk interface {
-	Kind() []byte
+	Kind() Kind
 	OID() *OID
 	Data() []byte
 	DataLen() uint32
@@ -24,12 +24,12 @@ var padding = make([]byte, 16)
 
 // Data associated with any kind of chunk.
 type sharedChunk struct {
-	kind []byte
+	kind Kind
 	oid  *OID
 }
 
-func (ch *sharedChunk) Kind() []byte { return ch.kind }
-func (ch *sharedChunk) OID() *OID    { return ch.oid }
+func (ch *sharedChunk) Kind() Kind { return ch.kind }
+func (ch *sharedChunk) OID() *OID  { return ch.oid }
 
 // Data chunks are ones started with the data originally uncompressed.
 type dataChunk struct {
@@ -42,7 +42,7 @@ func (ch *dataChunk) Data() []byte          { return ch.data }
 func (ch *dataChunk) DataLen() uint32       { return uint32(len(ch.data)) }
 func (ch *dataChunk) ZData() ([]byte, bool) { return ch.getZData() }
 
-func newDataChunk(kind []byte, oid *OID, data []byte) Chunk {
+func newDataChunk(kind Kind, oid *OID, data []byte) Chunk {
 	var zdata []byte
 	present := false
 
@@ -73,7 +73,7 @@ func NewChunk(kind string, data []byte) Chunk {
 		panic("Chunk kind must be 4 characters")
 	}
 	oid := BlobOID(kind, data)
-	return newDataChunk([]byte(kind), oid, data)
+	return newDataChunk(NewKind(kind), oid, data)
 }
 
 // Performing Chunk IO.
@@ -114,6 +114,16 @@ func ChunkWrite(ch Chunk, w io.Writer) (err error) {
 	}
 
 	err = writeLE32(&header, uclen)
+	if err != nil {
+		return
+	}
+
+	_, err = header.Write([]byte(ch.Kind().String()))
+	if err != nil {
+		return
+	}
+
+	_, err = header.Write(ch.OID()[:])
 	if err != nil {
 		return
 	}
@@ -165,7 +175,7 @@ func (ch *compressedChunk) DataLen() uint32       { return ch.dataLen }
 func (ch *compressedChunk) ZData() ([]byte, bool) { return ch.zdata, true }
 
 // Construct a new chunk out of compressed data.
-func newCompressedChunk(kind []byte, oid *OID, dataLen uint32, zdata []byte) Chunk {
+func newCompressedChunk(kind Kind, oid *OID, dataLen uint32, zdata []byte) Chunk {
 	var data []byte
 
 	getData := func() {
@@ -186,6 +196,7 @@ func newCompressedChunk(kind []byte, oid *OID, dataLen uint32, zdata []byte) Chu
 }
 
 // Read the header of a chunk at the given offset.
+// TODO: Can this use encoding/binary.
 func readChunkHeader(rd io.Reader, header *chunkHeader) (err error) {
 	var raw [48]byte
 	_, err = io.ReadFull(rd, raw[:])
@@ -202,6 +213,7 @@ func readChunkHeader(rd io.Reader, header *chunkHeader) (err error) {
 	dataLen := readLE32(raw[20:24])
 	kind := make([]byte, 4)
 	copy(kind, raw[24:28])
+	header.oid = new(OID)
 	copy(header.oid[:], raw[28:48])
 
 	header.kind = kind
@@ -227,9 +239,9 @@ func ChunkRead(rd io.Reader) (chunk Chunk, pad int, err error) {
 	}
 
 	if header.dataLen == 0xFFFFFFFF {
-		chunk = newDataChunk(header.kind, header.oid, payload)
+		chunk = newDataChunk(NewKind(string(header.kind)), header.oid, payload)
 	} else {
-		chunk = newCompressedChunk(header.kind, header.oid, header.dataLen, payload)
+		chunk = newCompressedChunk(NewKind(string(header.kind)), header.oid, header.dataLen, payload)
 	}
 
 	pad = 15 & -int(header.payloadLen)
