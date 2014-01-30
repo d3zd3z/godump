@@ -5,6 +5,7 @@ package pool
 import (
 	"bytes"
 	"compress/zlib"
+	"encoding/binary"
 	"errors"
 	"io"
 	"sync"
@@ -73,7 +74,7 @@ func NewChunk(kind string, data []byte) Chunk {
 		panic("Chunk kind must be 4 characters")
 	}
 	oid := BlobOID(kind, data)
-	return newDataChunk(NewKind(kind), oid, data)
+	return newDataChunk(StringToKind(kind), oid, data)
 }
 
 // Performing Chunk IO.
@@ -108,12 +109,12 @@ func ChunkWrite(ch Chunk, w io.Writer) (err error) {
 		payload = ch.Data()
 	}
 
-	err = writeLE32(&header, clen)
+	err = binary.Write(&header, binary.LittleEndian, &clen)
 	if err != nil {
 		return
 	}
 
-	err = writeLE32(&header, uclen)
+	err = binary.Write(&header, binary.LittleEndian, &uclen)
 	if err != nil {
 		return
 	}
@@ -146,6 +147,7 @@ func ChunkWrite(ch Chunk, w io.Writer) (err error) {
 	return
 }
 
+// TODO: Eliminate this.
 func writeLE32(w io.Writer, item uint32) (err error) {
 	var buf [4]byte
 	buf[0] = byte(item & 0xFF)
@@ -239,9 +241,9 @@ func ChunkRead(rd io.Reader) (chunk Chunk, pad int, err error) {
 	}
 
 	if header.dataLen == 0xFFFFFFFF {
-		chunk = newDataChunk(NewKind(string(header.kind)), header.oid, payload)
+		chunk = newDataChunk(BytesToKind(header.kind), header.oid, payload)
 	} else {
-		chunk = newCompressedChunk(NewKind(string(header.kind)), header.oid, header.dataLen, payload)
+		chunk = newCompressedChunk(BytesToKind(header.kind), header.oid, header.dataLen, payload)
 	}
 
 	pad = 15 & -int(header.payloadLen)

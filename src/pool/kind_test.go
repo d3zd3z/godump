@@ -1,6 +1,7 @@
 package pool_test
 
 import (
+	"bytes"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -10,12 +11,17 @@ import (
 )
 
 func TestKind(t *testing.T) {
-	k1 := pool.NewKind("abcd")
+	k1 := pool.StringToKind("abcd")
 	if k1.String() != "abcd" {
 		t.Fatal("Kind mismatch")
 	}
 
 	err := quick.Check(oneKind, nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = quick.Check(oneByteKind, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -33,6 +39,11 @@ func (k TextKind) Generate(r *rand.Rand, _ int) reflect.Value {
 }
 
 func oneKind(text TextKind) bool {
-	k := pool.NewKind(string(text))
+	k := pool.StringToKind(string(text))
 	return k.String() == string(text)
+}
+
+func oneByteKind(text TextKind) bool {
+	k := pool.BytesToKind([]byte(text))
+	return bytes.Compare(k.Bytes(), []byte(text)) == 0
 }
