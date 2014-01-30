@@ -12,21 +12,38 @@ import (
 // in the textual order, when written little endian.
 type Kind uint32
 
-func StringToKind(text string) (result Kind) {
-	return BytesToKind([]byte(text))
+// The program typically has a small number of kinds, so just memoize
+// the ones we use.
+var kindMap map[string]Kind
+
+func init() {
+	kindMap = make(map[string]Kind)
 }
 
-func BytesToKind(text []byte) (result Kind) {
+func StringToKind(text string) (result Kind) {
+
+	result, ok := kindMap[text]
+	if ok {
+		return
+	}
+
 	if len(text) != 4 {
 		panic("Invalid kind length")
 	}
 
-	buf := bytes.NewBuffer(text)
+	buf := bytes.NewBuffer([]byte(text))
 	err := binary.Read(buf, binary.LittleEndian, &result)
 	if err != nil {
 		panic("Error reading 32-bit value")
 	}
+
+	kindMap[text] = result
+
 	return
+}
+
+func BytesToKind(text []byte) (result Kind) {
+	return StringToKind(string(text))
 }
 
 func (k Kind) Bytes() []byte {
