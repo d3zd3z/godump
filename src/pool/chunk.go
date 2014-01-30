@@ -80,56 +80,36 @@ func NewChunk(kind string, data []byte) Chunk {
 // Performing Chunk IO.
 
 type chunkHeader struct {
-	kind       []byte
-	oid        *OID
-	payloadLen uint32
-	dataLen    uint32
+	Magic      [16]byte
+	PayloadLen uint32
+	DataLen    uint32
+	Kind       Kind
+	Oid        OID
 }
 
 // Write the Chunk encoded to the given writer.
 func ChunkWrite(ch Chunk, w io.Writer) (err error) {
-	var header bytes.Buffer
-	_, err = header.Write(chunkMagic)
-	if err != nil {
-		return
-	}
+	var header chunkHeader
+
+	copy(header.Magic[:], chunkMagic)
+	header.Kind = ch.Kind()
+	header.Oid = *ch.OID()
 
 	zdata, hasZ := ch.ZData()
 
-	var clen, uclen uint32
 	var payload []byte
 
 	if hasZ {
-		clen = uint32(len(zdata))
-		uclen = ch.DataLen()
+		header.PayloadLen = uint32(len(zdata))
+		header.DataLen = ch.DataLen()
 		payload = zdata
 	} else {
-		clen = ch.DataLen()
-		uclen = 0xFFFFFFFF
+		header.PayloadLen = ch.DataLen()
+		header.DataLen = 0xFFFFFFFF
 		payload = ch.Data()
 	}
 
-	err = binary.Write(&header, binary.LittleEndian, &clen)
-	if err != nil {
-		return
-	}
-
-	err = binary.Write(&header, binary.LittleEndian, &uclen)
-	if err != nil {
-		return
-	}
-
-	_, err = header.Write([]byte(ch.Kind().String()))
-	if err != nil {
-		return
-	}
-
-	_, err = header.Write(ch.OID()[:])
-	if err != nil {
-		return
-	}
-
-	_, err = w.Write(header.Bytes())
+	err = binary.Write(w, binary.LittleEndian, &header)
 	if err != nil {
 		return
 	}
@@ -197,56 +177,32 @@ func newCompressedChunk(kind Kind, oid *OID, dataLen uint32, zdata []byte) Chunk
 		func() []byte { once.Do(getData); return data }}
 }
 
-// Read the header of a chunk at the given offset.
-// TODO: Can this use encoding/binary.
-func readChunkHeader(rd io.Reader, header *chunkHeader) (err error) {
-	var raw [48]byte
-	_, err = io.ReadFull(rd, raw[:])
-	if err != nil {
-		return
-	}
-
-	if !bytes.Equal(raw[0:16], chunkMagic) {
-		err = ChunkError
-		return
-	}
-
-	payloadLen := readLE32(raw[16:20])
-	dataLen := readLE32(raw[20:24])
-	kind := make([]byte, 4)
-	copy(kind, raw[24:28])
-	header.oid = new(OID)
-	copy(header.oid[:], raw[28:48])
-
-	header.kind = kind
-	header.payloadLen = payloadLen
-	header.dataLen = dataLen
-
-	return
-}
-
 // Read a chunk from the reader.  Also returns an amount of padding
 // that can be used to skip to the next chunk.
 func ChunkRead(rd io.Reader) (chunk Chunk, pad int, err error) {
 	var header chunkHeader
-	err = readChunkHeader(rd, &header)
-	if err != nil {
+	err = binary.Read(rd, binary.LittleEndian, &header)
+
+	if !bytes.Equal(header.Magic[:], chunkMagic) {
+		err = ChunkError
 		return
 	}
 
-	payload := make([]byte, header.payloadLen)
+	payload := make([]byte, header.PayloadLen)
 	_, err = io.ReadFull(rd, payload)
 	if err != nil {
 		return
 	}
 
-	if header.dataLen == 0xFFFFFFFF {
-		chunk = newDataChunk(BytesToKind(header.kind), header.oid, payload)
+	oid := header.Oid
+
+	if header.DataLen == 0xFFFFFFFF {
+		chunk = newDataChunk(header.Kind, &oid, payload)
 	} else {
-		chunk = newCompressedChunk(BytesToKind(header.kind), header.oid, header.dataLen, payload)
+		chunk = newCompressedChunk(header.Kind, &oid, header.DataLen, payload)
 	}
 
-	pad = 15 & -int(header.payloadLen)
+	pad = 15 & -int(header.PayloadLen)
 
 	return
 }

@@ -11,7 +11,7 @@ import (
 	"os"
 	"testing"
 
-	"pdump"
+	// "pdump"
 	"pool"
 )
 
@@ -46,7 +46,7 @@ func TestChunkIO(t *testing.T) {
 		var buf bytes.Buffer
 		pool.ChunkWrite(c, &buf)
 
-		pdump.Dump(buf.Bytes())
+		// pdump.Dump(buf.Bytes())
 		c2, pad, err := pool.ChunkRead(&buf)
 		if err != nil {
 			t.Errorf("Can't read chunk '%s'", err)
