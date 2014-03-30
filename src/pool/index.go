@@ -2,6 +2,17 @@
 
 package pool
 
+type ReadIndexer interface {
+	Lookup(oid OID) (offset uint32, present bool)
+	Len() int
+	ForEach(f func(oid OID, offset uint32))
+}
+
+type Indexer interface {
+	ReadIndexer
+	Add(oid OID, offset uint32)
+}
+
 /*
 import (
 	"bytes"

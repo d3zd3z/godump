@@ -1,6 +1,4 @@
-// Specialized mapping between sha1 hashes in integer offsets.  This
-// is actually slightly slower than hash tables (depending on the key
-// size), but uses significantly less memory.
+// Just store the RAM mapping using the OID.
 
 package pool
 
