@@ -1,12 +1,37 @@
 package main
 
-import "fmt"
-import "pool"
-import "sort"
-import "time"
+import (
+	"flag"
+	"fmt"
+	"log"
+	"pool"
+	"sort"
+	"time"
+)
+
+func mainz() {
+	pool.IndexMain()
+}
 
 func main() {
-	pool.IndexMain()
+	flag.Parse()
+
+	if flag.NArg() < 1 {
+		flag.PrintDefaults()
+		log.Fatalf("Must specify subcommand")
+	}
+	switch flag.Arg(0) {
+	case "create":
+		if flag.NArg() != 2 {
+			log.Fatalf("usage: godump create path")
+		}
+		err := pool.CreateSqlPool(flag.Arg(1))
+		if err != nil {
+			log.Fatalf("Error creating pool: %s", err)
+		}
+	default:
+		log.Fatalf("Unknown subcommand: %s", flag.Arg(0))
+	}
 }
 
 func mainy() {

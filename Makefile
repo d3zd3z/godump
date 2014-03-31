@@ -8,6 +8,10 @@ godump: .force
 	@echo '[GO]    ' $@
 	@GOPATH=$(PWD) go install $(GOFLAGS) $@
 
+get: .force
+	@echo '[GET]   ' godump
+	@GOPATH=$(PWD) go get -d $(GOFLAGS) godump
+
 TESTS = pdump.test pool.test
 
 test: $(TESTS)
