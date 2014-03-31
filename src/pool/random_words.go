@@ -14,7 +14,7 @@ type rng struct {
 // This is biased, but shouldn't matter here.
 func (st *rng) next(limit int) int {
 	st.state = (st.state * 1103515245) + 12345
-	return int(st.state&0x7ffffff) % limit
+	return int((st.state&0x7ffffff)>>16) % limit
 }
 
 func MakeRandomSentence(seed, size int) string {
