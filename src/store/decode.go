@@ -14,21 +14,25 @@ import (
 type walker struct {
 	pool     pool.Pool
 	handlers map[pool.Kind]handler
+
+	// The current visitor.
+	visit *Visitor
 }
 
 func Walk(p pool.Pool, root *pool.OID, visit *Visitor) (err error) {
-	var walk walker
-	walk.pool = p
+	var self walker
+	self.pool = p
+	self.visit = visit
 
-	walk.handlers = map[pool.Kind]handler{
-		pool.StringToKind("back"): walk.backHandler,
+	self.handlers = map[pool.Kind]handler{
+		pool.StringToKind("back"): self.backHandler,
 	}
 
-	return walk.walk(root, visit)
+	return self.walk(root)
 }
 
-func (walk *walker) walk(oid *pool.OID, visit *Visitor) (err error) {
-	ch, err := walk.pool.Search(oid)
+func (self *walker) walk(oid *pool.OID) (err error) {
+	ch, err := self.pool.Search(oid)
 	if err != nil {
 		return
 	}
@@ -36,18 +40,18 @@ func (walk *walker) walk(oid *pool.OID, visit *Visitor) (err error) {
 		err = errors.New(fmt.Sprintf("Unable to read oid from pool: %q", oid.String()))
 	}
 
-	hand, ok := walk.handlers[ch.Kind()]
+	hand, ok := self.handlers[ch.Kind()]
 	if !ok {
 		err = errors.New(fmt.Sprintf("Unsupported kind %q", ch.Kind().String()))
 		return
 	}
 
-	return hand(ch, visit)
+	return hand(ch)
 }
 
-type handler func(chunk pool.Chunk, visit *Visitor) (err error)
+type handler func(chunk pool.Chunk) (err error)
 
-func (walk *walker) backHandler(chunk pool.Chunk, visit *Visitor) (err error) {
+func (self *walker) backHandler(chunk pool.Chunk) (err error) {
 	pmap, err := decodeProp(chunk.Data())
 	if err != nil {
 		return
@@ -67,7 +71,7 @@ func (walk *walker) backHandler(chunk pool.Chunk, visit *Visitor) (err error) {
 
 	delete(pmap.props, "_date")
 
-	err = visit.Back(chunk.OID(), date, pmap.props)
+	err = self.visit.Back(chunk.OID(), date, pmap.props)
 
 	if err != nil {
 		if err == Prune {
