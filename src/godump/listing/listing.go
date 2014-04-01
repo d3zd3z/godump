@@ -1,6 +1,6 @@
 // Source listing.
 
-package main
+package listing
 
 import (
 	"fmt"
@@ -58,7 +58,7 @@ func (this *lister) show() {
 	}
 }
 
-func listing(pl pool.Pool) (err error) {
+func Run(pl pool.Pool) (err error) {
 	backups, err := pl.Backups()
 	if err != nil {
 		return

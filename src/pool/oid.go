@@ -60,6 +60,19 @@ func BlobOID(kind string, data []byte) (oid *OID) {
 	return &result
 }
 
+// Extract the next OID out of the bytes.Buffer.
+func OIDFromBytes(buf *bytes.Buffer) (oid *OID, err error) {
+	tmp := buf.Next(20)
+	if len(tmp) != 20 {
+		err = errors.New("Short read of OID from buffer")
+		return
+	}
+	var result OID
+	copy(result[:], tmp)
+	oid = &result
+	return
+}
+
 // For tests, it's handy to be able to make hashes based on integers.
 func IntOID(index int) (oid *OID) {
 	return BlobOID("blob", []byte(strconv.Itoa(index)))

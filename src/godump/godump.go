@@ -7,6 +7,9 @@ import (
 	"pool"
 	"sort"
 	"time"
+
+	"godump/listing"
+	"godump/restore"
 )
 
 func mainz() {
@@ -39,10 +42,29 @@ func main() {
 			log.Fatalf("Error opening pool: %s", err)
 		}
 		defer pl.Close()
-		err = listing(pl)
+		err = listing.Run(pl)
 		if err != nil {
 			log.Fatalf("Error listing pool: %s", err)
 		}
+
+	case "restore":
+		if flag.NArg() != 4 {
+			log.Fatalf("usage: godump restore path hash dir")
+		}
+		pl, err := pool.OpenPool(flag.Arg(1))
+		if err != nil {
+			log.Fatalf("Error opening pool: %s", err)
+		}
+		defer pl.Close()
+		id, err := pool.ParseOID(flag.Arg(2))
+		if err != nil {
+			log.Fatalf("Invalid hash: %s", err)
+		}
+		err = restore.Run(pl, id, flag.Arg(3))
+		if err != nil {
+			log.Fatalf("Error restoring backup: %s", err)
+		}
+
 	default:
 		log.Fatalf("Unknown subcommand: %s", flag.Arg(0))
 	}

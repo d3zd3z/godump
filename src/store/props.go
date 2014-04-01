@@ -4,21 +4,23 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 // Property list conversion.
 // This is a fairly simplistic encoding format.
 
-type propertyMap struct {
-	kind  string
-	props map[string]string
+type PropertyMap struct {
+	Kind  string
+	Props map[string]string
 }
 
-func decodeProp(data []byte) (pmap propertyMap, err error) {
-	pmap.props = make(map[string]string)
+func decodeProp(data []byte) (pmap *PropertyMap, err error) {
+	var result PropertyMap
+	result.Props = make(map[string]string)
 
 	buf := bytes.NewBuffer(data)
-	pmap.kind, err = readString8(buf)
+	result.Kind, err = readString8(buf)
 	if err != nil {
 		return
 	}
@@ -26,11 +28,20 @@ func decodeProp(data []byte) (pmap propertyMap, err error) {
 	for buf.Len() > 0 {
 		var kind string
 		kind, err = readString8(buf)
+		if err != nil {
+			return
+		}
+
 		var value string
 		value, err = readString16(buf)
-		pmap.props[kind] = value
+		if err != nil {
+			return
+		}
+
+		result.Props[kind] = value
 	}
 
+	pmap = &result
 	return
 }
 
@@ -65,9 +76,25 @@ func readString(buf *bytes.Buffer, size int) (result string, err error) {
 }
 
 // For debugging.
-func (p *propertyMap) Print() {
-	fmt.Printf("Props: %q\n", p.kind)
-	for k, v := range p.props {
+func (p *PropertyMap) Print() {
+	fmt.Printf("Props: %q\n", p.Kind)
+	for k, v := range p.Props {
 		fmt.Printf("  %q: %q\n", k, v)
 	}
+}
+
+// User utilities for extracting properties.
+func (self *PropertyMap) GetInt(name string) (value int, err error) {
+	text, ok := self.Props[name]
+	if !ok {
+		err = errors.New(fmt.Sprintf("Missing property: %q", name))
+		return
+	}
+	tmp, err := strconv.ParseInt(text, 10, 32)
+	if err != nil {
+		return
+	}
+
+	value = int(tmp)
+	return
 }
