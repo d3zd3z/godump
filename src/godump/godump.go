@@ -29,6 +29,20 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error creating pool: %s", err)
 		}
+
+	case "list":
+		if flag.NArg() != 2 {
+			log.Fatalf("usage: godump list path")
+		}
+		pl, err := pool.OpenPool(flag.Arg(1))
+		if err != nil {
+			log.Fatalf("Error opening pool: %s", err)
+		}
+		defer pl.Close()
+		err = listing(pl)
+		if err != nil {
+			log.Fatalf("Error listing pool: %s", err)
+		}
 	default:
 		log.Fatalf("Unknown subcommand: %s", flag.Arg(0))
 	}
