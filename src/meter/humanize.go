@@ -14,7 +14,7 @@ func Humanize(value int64) string {
 		pos++
 	}
 
-	return fmt.Sprintf("%6.1f%s", dsize, units[pos])
+	return fmt.Sprintf("%7.2f %s", dsize, units[pos])
 }
 
 var units = []string{

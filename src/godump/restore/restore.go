@@ -26,6 +26,8 @@ type restoreState struct {
 	chunkCount int64
 	byteCount  int64
 	zbyteCount int64
+	fileCount  int64
+	dirCount   int64
 }
 
 func newRestoreState(base string) *restoreState {
@@ -59,6 +61,8 @@ func (self *restoreState) open(props *store.PropertyMap) (err error) {
 	self.file, err = os.OpenFile(self.Path(),
 		os.O_WRONLY|os.O_CREATE|os.O_EXCL,
 		0600)
+	self.fileCount++
+	meter.Sync(self, false)
 	return
 }
 
@@ -76,6 +80,9 @@ func (self *restoreState) enter(props *store.PropertyMap) (err error) {
 	// require things to be moved out later.
 	name := self.Path()
 	err = os.Mkdir(name, 0700)
+
+	self.dirCount++
+	meter.Sync(self, false)
 	return
 }
 
@@ -188,12 +195,20 @@ func (self *restoreState) chunk(chunk pool.Chunk) (err error) {
 
 // Generate the progress meter.
 func (self *restoreState) GetMeter() (result []string) {
-	result = make([]string, 3)
+	result = make([]string, 6)
 
-	result[0] = fmt.Sprintf("   %9d chunks", self.chunkCount)
-	result[1] = fmt.Sprintf("   %s bytes", meter.Humanize(self.byteCount))
-	result[2] = fmt.Sprintf("   %s zbytes (%5.1f%%)", meter.Humanize(self.zbyteCount),
+	result[0] = "----------------------------------------------------------------------"
+	result[1] = fmt.Sprintf("   %11d chunks, %9d files, %9d dirs", self.chunkCount, self.fileCount, self.dirCount)
+	result[2] = fmt.Sprintf("   %s data", meter.Humanize(self.byteCount))
+	result[3] = fmt.Sprintf("   %s zdata (%5.1f%%)", meter.Humanize(self.zbyteCount),
 		100.0*float64(self.zbyteCount)/float64(self.byteCount))
+
+	path := self.Path()
+	if len(path) > 73 {
+		path = "..." + path[len(path)-60:]
+	}
+	result[4] = fmt.Sprintf(" : %q", path)
+	result[5] = "----------------------------------------------------------------------"
 	return
 }
 
