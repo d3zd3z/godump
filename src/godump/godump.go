@@ -10,6 +10,7 @@ import (
 
 	"godump/listing"
 	"godump/restore"
+	"meter"
 )
 
 func mainz() {
@@ -18,55 +19,68 @@ func mainz() {
 
 func main() {
 	flag.Parse()
+	meter.Setup()
+	defer meter.Shutdown()
 
 	if flag.NArg() < 1 {
 		flag.PrintDefaults()
-		log.Fatalf("Must specify subcommand")
+		log.Printf("Must specify subcommand")
+		return
 	}
 	switch flag.Arg(0) {
 	case "create":
 		if flag.NArg() != 2 {
-			log.Fatalf("usage: godump create path")
+			log.Printf("usage: godump create path")
+			return
 		}
 		err := pool.CreateSqlPool(flag.Arg(1))
 		if err != nil {
-			log.Fatalf("Error creating pool: %s", err)
+			log.Printf("Error creating pool: %s", err)
+			return
 		}
 
 	case "list":
 		if flag.NArg() != 2 {
-			log.Fatalf("usage: godump list path")
+			log.Printf("usage: godump list path")
+			return
 		}
 		pl, err := pool.OpenPool(flag.Arg(1))
 		if err != nil {
-			log.Fatalf("Error opening pool: %s", err)
+			log.Printf("Error opening pool: %s", err)
+			return
 		}
 		defer pl.Close()
 		err = listing.Run(pl)
 		if err != nil {
-			log.Fatalf("Error listing pool: %s", err)
+			log.Printf("Error listing pool: %s", err)
+			return
 		}
 
 	case "restore":
 		if flag.NArg() != 4 {
-			log.Fatalf("usage: godump restore path hash dir")
+			log.Printf("usage: godump restore path hash dir")
+			return
 		}
 		pl, err := pool.OpenPool(flag.Arg(1))
 		if err != nil {
-			log.Fatalf("Error opening pool: %s", err)
+			log.Printf("Error opening pool: %s", err)
+			return
 		}
 		defer pl.Close()
 		id, err := pool.ParseOID(flag.Arg(2))
 		if err != nil {
-			log.Fatalf("Invalid hash: %s", err)
+			log.Printf("Invalid hash: %s", err)
+			return
 		}
 		err = restore.Run(pl, id, flag.Arg(3))
 		if err != nil {
-			log.Fatalf("Error restoring backup: %s", err)
+			log.Printf("Error restoring backup: %s", err)
+			return
 		}
 
 	default:
-		log.Fatalf("Unknown subcommand: %s", flag.Arg(0))
+		log.Printf("Unknown subcommand: %s", flag.Arg(0))
+		return
 	}
 }
 

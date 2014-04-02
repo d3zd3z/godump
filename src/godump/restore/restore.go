@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"meter"
 	"pool"
 	"store"
 )
@@ -20,6 +21,11 @@ type restoreState struct {
 
 	// Current open file.
 	file *os.File
+
+	// Part of progress meter.
+	chunkCount int64
+	byteCount  int64
+	zbyteCount int64
 }
 
 func newRestoreState(base string) *restoreState {
@@ -33,6 +39,7 @@ func newRestoreState(base string) *restoreState {
 	self.visit.Enter = self.enter
 	self.visit.Leave = self.leave
 	self.visit.Blob = self.blob
+	self.visit.Chunk = self.chunk
 
 	return &self
 }
@@ -44,6 +51,7 @@ func Run(pl pool.Pool, id *pool.OID, path string) (err error) {
 	if err != nil {
 		return
 	}
+	meter.Sync(state, true)
 	return
 }
 
@@ -163,6 +171,30 @@ func (self *restoreState) blob(chunk pool.Chunk) (err error) {
 
 func (self *restoreState) Path() string {
 	return self.visit.Path(self.base)
+}
+
+func (self *restoreState) chunk(chunk pool.Chunk) (err error) {
+	self.chunkCount++
+	self.byteCount += int64(chunk.DataLen())
+	zdata, present := chunk.ZData()
+	if present {
+		self.zbyteCount += int64(len(zdata))
+	} else {
+		self.zbyteCount += int64(chunk.DataLen())
+	}
+	meter.Sync(self, false)
+	return
+}
+
+// Generate the progress meter.
+func (self *restoreState) GetMeter() (result []string) {
+	result = make([]string, 3)
+
+	result[0] = fmt.Sprintf("   %9d chunks", self.chunkCount)
+	result[1] = fmt.Sprintf("   %s bytes", meter.Humanize(self.byteCount))
+	result[2] = fmt.Sprintf("   %s zbytes (%5.1f%%)", meter.Humanize(self.zbyteCount),
+		100.0*float64(self.zbyteCount)/float64(self.byteCount))
+	return
 }
 
 // Holds whether we are running as root or not.
