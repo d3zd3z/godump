@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"meter"
@@ -114,7 +115,7 @@ func restoreReg(path string, props *store.PropertyMap) (err error) {
 	if err != nil {
 		return
 	}
-	err = os.Chmod(path, os.FileMode(mode))
+	err = syscall.Chmod(path, uint32(mode))
 	if err != nil {
 		return
 	}
