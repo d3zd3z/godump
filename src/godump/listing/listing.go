@@ -62,6 +62,7 @@ func Run(pl pool.Pool) (err error) {
 	}
 
 	var self lister
+	self.InitPath()
 
 	fmt.Printf("Listing: %d\n", len(backups))
 	for _, oid := range backups {

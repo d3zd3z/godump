@@ -36,6 +36,7 @@ type restoreState struct {
 func Run(pl pool.Pool, id *pool.OID, path string) (err error) {
 	var state restoreState
 	state.base = path
+	state.InitPath()
 
 	err = store.Walk(pl, id, &state)
 	if err != nil {
