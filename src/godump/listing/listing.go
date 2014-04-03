@@ -19,21 +19,18 @@ type backNode struct {
 
 type lister struct {
 	nodes []*backNode
+
+	store.PathTrackerImpl
+	store.EmptyVisitor
 }
 
-func (this *lister) back(root *pool.OID, date time.Time, props map[string]string) (err error) {
+func (this *lister) Back(root *pool.OID, date time.Time, props map[string]string) (err error) {
 	bn := &backNode{
 		oid:   root,
 		date:  date,
 		props: props}
 	this.nodes = append(this.nodes, bn)
 	return store.Prune
-}
-
-func (this *lister) getVisitor() *store.Visitor {
-	v := store.NewVisitor()
-	v.Back = this.back
-	return v
 }
 
 func (this *lister) sort() {
@@ -64,18 +61,17 @@ func Run(pl pool.Pool) (err error) {
 		return
 	}
 
-	var lst lister
-	visit := lst.getVisitor()
+	var self lister
 
 	fmt.Printf("Listing: %d\n", len(backups))
 	for _, oid := range backups {
-		err = store.Walk(pl, oid, visit)
+		err = store.Walk(pl, oid, &self)
 		if err != nil {
 			return
 		}
 	}
-	lst.sort()
-	lst.show()
+	self.sort()
+	self.show()
 	return
 }
 

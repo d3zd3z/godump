@@ -18,10 +18,10 @@ type walker struct {
 	handlers map[pool.Kind]handler
 
 	// The current visitor.
-	visit *Visitor
+	visit Visitor
 }
 
-func Walk(p pool.Pool, root *pool.OID, visit *Visitor) (err error) {
+func Walk(p pool.Pool, root *pool.OID, visit Visitor) (err error) {
 	var self walker
 	self.pool = p
 	self.visit = visit
@@ -204,9 +204,9 @@ func (self *walker) dirHandler(chunk pool.Chunk) (err error) {
 		}
 		// fmt.Printf("%s %q\n", oid.String(), name)
 
-		self.visit.pushPath(name)
+		self.visit.PushPath(name)
 		err = self.walk(oid)
-		self.visit.popPath()
+		self.visit.PopPath()
 		if err != nil {
 			return
 		}

@@ -17,8 +17,7 @@ import (
 )
 
 type restoreState struct {
-	base  string
-	visit *store.Visitor
+	base string
 
 	// Current open file.
 	file *os.File
@@ -29,37 +28,25 @@ type restoreState struct {
 	zbyteCount int64
 	fileCount  int64
 	dirCount   int64
-}
 
-func newRestoreState(base string) *restoreState {
-	var self restoreState
-
-	self.base = base
-	self.visit = store.NewVisitor()
-
-	self.visit.Open = self.open
-	self.visit.Close = self.close
-	self.visit.Enter = self.enter
-	self.visit.Leave = self.leave
-	self.visit.Blob = self.blob
-	self.visit.Chunk = self.chunk
-
-	return &self
+	store.PathTrackerImpl
+	store.EmptyVisitor
 }
 
 func Run(pl pool.Pool, id *pool.OID, path string) (err error) {
-	state := newRestoreState(path)
+	var state restoreState
+	state.base = path
 
-	err = store.Walk(pl, id, state.visit)
+	err = store.Walk(pl, id, &state)
 	if err != nil {
 		return
 	}
-	meter.Sync(state, true)
+	meter.Sync(&state, true)
 	return
 }
 
-func (self *restoreState) open(props *store.PropertyMap) (err error) {
-	self.file, err = os.OpenFile(self.Path(),
+func (self *restoreState) Open(props *store.PropertyMap) (err error) {
+	self.file, err = os.OpenFile(self.FullPath(),
 		os.O_WRONLY|os.O_CREATE|os.O_EXCL,
 		0600)
 	self.fileCount++
@@ -67,19 +54,19 @@ func (self *restoreState) open(props *store.PropertyMap) (err error) {
 	return
 }
 
-func (self *restoreState) close(props *store.PropertyMap) (err error) {
+func (self *restoreState) Close(props *store.PropertyMap) (err error) {
 	err = self.file.Close()
 	if err != nil {
 		return
 	}
-	return restoreReg(self.Path(), props)
+	return restoreReg(self.FullPath(), props)
 }
 
-func (self *restoreState) enter(props *store.PropertyMap) (err error) {
+func (self *restoreState) Enter(props *store.PropertyMap) (err error) {
 	// TODO: Do we want to special case the root directory should
 	// exist, or should we always restore into a new dir, and
 	// require things to be moved out later.
-	name := self.Path()
+	name := self.FullPath()
 	err = os.Mkdir(name, 0700)
 
 	self.dirCount++
@@ -87,8 +74,8 @@ func (self *restoreState) enter(props *store.PropertyMap) (err error) {
 	return
 }
 
-func (self *restoreState) leave(props *store.PropertyMap) (err error) {
-	return restoreReg(self.Path(), props)
+func (self *restoreState) Leave(props *store.PropertyMap) (err error) {
+	return restoreReg(self.FullPath(), props)
 }
 
 // Restore the stats on the given file.
@@ -172,16 +159,16 @@ func decodeTimestamp(text string) (result time.Time, err error) {
 	return
 }
 
-func (self *restoreState) blob(chunk pool.Chunk) (err error) {
+func (self *restoreState) Blob(chunk pool.Chunk) (err error) {
 	_, err = self.file.Write(chunk.Data())
 	return
 }
 
-func (self *restoreState) Path() string {
-	return self.visit.Path(self.base)
+func (self *restoreState) FullPath() string {
+	return self.Path(self.base)
 }
 
-func (self *restoreState) chunk(chunk pool.Chunk) (err error) {
+func (self *restoreState) Chunk(chunk pool.Chunk) (err error) {
 	self.chunkCount++
 	self.byteCount += int64(chunk.DataLen())
 	zdata, present := chunk.ZData()
@@ -204,7 +191,7 @@ func (self *restoreState) GetMeter() (result []string) {
 	result[3] = fmt.Sprintf("   %s zdata (%5.1f%%)", meter.Humanize(self.zbyteCount),
 		100.0*float64(self.zbyteCount)/float64(self.byteCount))
 
-	path := self.Path()
+	path := self.FullPath()
 	if len(path) > 73 {
 		path = "..." + path[len(path)-60:]
 	}
