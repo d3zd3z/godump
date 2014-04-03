@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"pool"
+	"tutil"
 )
 
 func TestIndexBase(t *testing.T) {
-	tmp := NewTempDir(t)
+	tmp := tutil.NewTempDir(t)
 	defer tmp.Clean()
 }
 

@@ -9,6 +9,7 @@ import (
 
 	// "pdump"
 	"pool"
+	"tutil"
 )
 
 func TestCreate(t *testing.T) {
@@ -36,7 +37,7 @@ func TestCreate(t *testing.T) {
 
 type PoolTest struct {
 	t    *testing.T
-	tmp  *TempDir
+	tmp  *tutil.TempDir
 	pool pool.Pool
 
 	known []pool.Chunk
@@ -45,7 +46,7 @@ type PoolTest struct {
 func NewPoolTest(t *testing.T) (pt *PoolTest) {
 	var result PoolTest
 	result.t = t
-	result.tmp = NewTempDir(t)
+	result.tmp = tutil.NewTempDir(t)
 
 	base := result.tmp.Path() + "/pool"
 	err := pool.CreateSqlPool(base)
