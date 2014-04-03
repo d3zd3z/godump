@@ -36,28 +36,14 @@ func TestCreate(t *testing.T) {
 }
 
 type PoolTest struct {
-	t    *testing.T
-	tmp  *tutil.TempDir
-	pool pool.Pool
+	*tutil.PoolTest
 
 	known []pool.Chunk
 }
 
 func NewPoolTest(t *testing.T) (pt *PoolTest) {
 	var result PoolTest
-	result.t = t
-	result.tmp = tutil.NewTempDir(t)
-
-	base := result.tmp.Path() + "/pool"
-	err := pool.CreateSqlPool(base)
-	if err != nil {
-		t.Errorf("Unable to create pool: '%s'", err)
-	}
-
-	result.pool, err = pool.OpenPool(base)
-	if err != nil {
-		t.Errorf("Unable to open created pool: '%s'", err)
-	}
+	result.PoolTest = tutil.NewPoolTest(t)
 
 	result.known = make([]pool.Chunk, 0)
 
@@ -65,19 +51,16 @@ func NewPoolTest(t *testing.T) (pt *PoolTest) {
 }
 
 func (pt *PoolTest) Clean() {
-	if pt.pool != nil {
-		pt.pool.Close()
-	}
-	pt.tmp.Clean()
+	pt.PoolTest.Clean()
 }
 
 func (pt *PoolTest) Insert(index int) {
 	// TODO: These, unfortunately, always compress well enough to
 	// keep them small enough to put directly in the database.
 	ch := pool.MakeRandomChunk(index)
-	err := pt.pool.Insert(ch)
+	err := pt.Pool.Insert(ch)
 	if err != nil {
-		pt.t.Errorf("Error inserting chunk: '%s'", err)
+		pt.T.Errorf("Error inserting chunk: '%s'", err)
 	}
 	pt.known = append(pt.known, ch)
 }
@@ -93,41 +76,41 @@ func (pt *PoolTest) InsertRandom(size int) {
 	}
 	ch := pool.NewChunk("blob", buf)
 	// pdump.Dump(buf)
-	err := pt.pool.Insert(ch)
+	err := pt.Pool.Insert(ch)
 	if err != nil {
-		pt.t.Errorf("Error inserting chunk: '%s'", err)
+		pt.T.Errorf("Error inserting chunk: '%s'", err)
 	}
 	pt.known = append(pt.known, ch)
 }
 
 func (pt *PoolTest) Check() {
 	for _, ch := range pt.known {
-		result, err := pt.pool.Contains(ch.OID())
+		result, err := pt.Pool.Contains(ch.OID())
 		if err != nil {
-			pt.t.Errorf("Error checking if pool contains blob.")
+			pt.T.Errorf("Error checking if pool contains blob.")
 		}
 		if !result {
-			pt.t.Errorf("Pool should contain blob.")
+			pt.T.Errorf("Pool should contain blob.")
 		}
 
 		// Make sure we can read the chunk as well.
-		ch2, err := pt.pool.Search(ch.OID())
+		ch2, err := pt.Pool.Search(ch.OID())
 		if err != nil {
-			pt.t.Errorf("Error reading chunk")
+			pt.T.Errorf("Error reading chunk")
 		}
 		if ch2 == nil {
-			pt.t.Errorf("Did not find previously inserted chunk")
+			pt.T.Errorf("Did not find previously inserted chunk")
 		}
 		if ch.Kind() != ch2.Kind() || bytes.Compare(ch.Data(), ch2.Data()) != 0 {
-			pt.t.Errorf("Chunk did not reread correctly")
+			pt.T.Errorf("Chunk did not reread correctly")
 		}
 	}
 }
 
 func (pt *PoolTest) Flush() {
-	err := pt.pool.Flush()
+	err := pt.Pool.Flush()
 	if err != nil {
-		pt.t.Errorf("Error flushing: '%s'", err)
+		pt.T.Errorf("Error flushing: '%s'", err)
 	}
 }
 
