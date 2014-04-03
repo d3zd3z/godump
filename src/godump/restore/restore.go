@@ -5,6 +5,7 @@ package restore
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -79,24 +80,21 @@ func (self *restoreState) Leave(props *store.PropertyMap) (err error) {
 	return restoreReg(self.FullPath(), props)
 }
 
+func (self *restoreState) Node(props *store.PropertyMap) (err error) {
+	switch props.Kind {
+	case "LNK":
+		err = restoreLink(self.FullPath(), props)
+	default:
+		log.Printf("TODO: Restore node %q: %s", props.Kind, self.FullPath())
+	}
+	return
+}
+
 // Restore the stats on the given file.
 func restoreReg(path string, props *store.PropertyMap) (err error) {
-	if isRoot {
-		var uid, gid int
-		uid, err = props.GetInt("uid")
-		if err != nil {
-			return
-		}
-
-		gid, err = props.GetInt("gid")
-		if err != nil {
-			return
-		}
-
-		err = os.Chown(path, uid, gid)
-		if err != nil {
-			return
-		}
+	err = propChown(path, props, os.Chown)
+	if err != nil {
+		return
 	}
 
 	mode, err := props.GetInt("mode")
@@ -109,6 +107,50 @@ func restoreReg(path string, props *store.PropertyMap) (err error) {
 	}
 
 	return restoreTime(path, props)
+}
+
+// Restore a symlink.  There isn't an lchmod in Linux, but we can set
+// a umask before creating the node.  The link permissions aren't
+// useful anyway, but it's nice to restore them correctly.
+func restoreLink(path string, props *store.PropertyMap) (err error) {
+	mode, err := props.GetInt("mode")
+	if err != nil {
+		return
+	}
+
+	target, ok := props.Props["target"]
+	if !ok {
+		err = errors.New("Symlink doesn't contain a 'target'")
+		return
+	}
+	oldMode := syscall.Umask(mode & 4095)
+	err = os.Symlink(target, path)
+	syscall.Umask(oldMode)
+	if err != nil {
+		return
+	}
+
+	err = propChown(path, props, os.Lchown)
+	return
+}
+
+// Perform an appropriate chown operation.
+func propChown(path string, props *store.PropertyMap, chown func(string, int, int) error) (err error) {
+	if !isRoot {
+		return
+	}
+	uid, err := props.GetInt("uid")
+	if err != nil {
+		return
+	}
+
+	gid, err := props.GetInt("gid")
+	if err != nil {
+		return
+	}
+
+	err = chown(path, uid, gid)
+	return
 }
 
 // Restore the timestamp on the given node.
