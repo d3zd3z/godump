@@ -12,7 +12,7 @@ get: .force
 	@echo '[GET]   ' godump
 	@GOPATH=$(PWD) go get -d $(GOFLAGS) godump
 
-TESTS = pdump.test pool.test store.test
+TESTS = pdump.test pool.test store.test linuxdir.test
 
 test: $(TESTS)
 
