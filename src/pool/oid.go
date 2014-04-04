@@ -11,7 +11,9 @@ import (
 	"strconv"
 )
 
-type OID [20]byte
+const OIDLen = 20
+
+type OID [OIDLen]byte
 
 func (item *OID) String() string {
 	return fmt.Sprintf("%x", item[:])
