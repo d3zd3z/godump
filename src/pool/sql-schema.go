@@ -11,6 +11,15 @@ import (
 type schema struct {
 	version string
 	schema  []string
+	compats []schemaCompat
+}
+
+// For compatibility with older schemas, each can have an associated
+// set of strings indicating features not present that the client can
+// check.
+type schemaCompat struct {
+	version     string
+	inabilities []string
 }
 
 // Attempt to set the schema for this database.
@@ -45,17 +54,33 @@ func setSchema(db *sql.DB, schema *schema) (err error) {
 	return
 }
 
-func checkSchema(db *sql.DB, schema *schema) (err error) {
+func checkSchema(db *sql.DB, schema *schema) (inabilities map[string]bool, err error) {
 	row := db.QueryRow("SELECT version FROM schema_version")
 	var version string
 	err = row.Scan(&version)
 	if err != nil {
-		return err
+		return
 	}
 
-	if version != schema.version {
-		err = errors.New("Schema version mismatch, expect: " +
-			schema.version + " got: " + version)
+	inabilities = make(map[string]bool)
+
+	// If this is the exact version, use it, with no inabilities.
+	if version == schema.version {
+		return
 	}
+
+	// Otherwise, check for old version and see what we support.
+	for _, compat := range schema.compats {
+		if version == compat.version {
+			for _, ina := range compat.inabilities {
+				inabilities[ina] = true
+			}
+
+			return
+		}
+	}
+
+	err = errors.New("Schema version mismatch, expect: " +
+		schema.version + " got: " + version)
 	return
 }

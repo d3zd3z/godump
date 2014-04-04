@@ -61,7 +61,7 @@ func OpenSqlPool(path string) (pf Pool, err error) {
 		return
 	}
 
-	err = checkSchema(pool.db, &poolSchema)
+	_, err = checkSchema(pool.db, &poolSchema)
 	if err != nil {
 		pool.db.Close()
 		return
@@ -209,6 +209,12 @@ func (pool *SqlPool) Contains(oid *OID) (result bool, err error) {
 
 var poolSchema = schema{
 	version: "1:2014-03-18",
+	compats: []schemaCompat{
+		{
+			version:     "1:2014-03-13",
+			inabilities: []string{"filesystems", "ctime_cache"},
+		},
+	},
 	schema: []string{
 		`CREATE TABLE blobs (
 			id integer primary key,
