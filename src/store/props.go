@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 )
 
@@ -13,6 +14,10 @@ import (
 type PropertyMap struct {
 	Kind  string
 	Props map[string]string
+}
+
+func NewPropertyMap(kind string) *PropertyMap {
+	return &PropertyMap{Kind: kind, Props: make(map[string]string)}
 }
 
 func decodeProp(data []byte) (pmap *PropertyMap, err error) {
@@ -81,6 +86,46 @@ func (p *PropertyMap) Print() {
 	for k, v := range p.Props {
 		fmt.Printf("  %q: %q\n", k, v)
 	}
+}
+
+// Encode the given properties to a block of bytes.  The properties
+// will be encoded in lexicographical order by key so that the same
+// properties will always encode the same way.
+func (p *PropertyMap) Encode() (result []byte) {
+	var buf bytes.Buffer
+
+	writeString8(&buf, p.Kind)
+
+	keys := make([]string, 0, len(p.Props))
+	for k := range p.Props {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		writeString8(&buf, k)
+		writeString16(&buf, p.Props[k])
+	}
+
+	return buf.Bytes()
+}
+
+func writeString8(buf *bytes.Buffer, text string) {
+	if len(text) > 255 {
+		panic("String is too long")
+	}
+	buf.WriteByte(byte(len(text)))
+	buf.WriteString(text)
+}
+
+func writeString16(buf *bytes.Buffer, text string) {
+	size := len(text)
+	if size > 0xffff {
+		panic("String is too long")
+	}
+	buf.WriteByte(byte(size >> 8))
+	buf.WriteByte(byte(size))
+	buf.WriteString(text)
 }
 
 // User utilities for extracting properties.

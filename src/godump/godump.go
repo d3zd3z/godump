@@ -1,13 +1,16 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"pool"
 	"sort"
+	"strings"
 	"time"
 
+	"godump/dump"
 	"godump/listing"
 	"godump/restore"
 	"meter"
@@ -78,10 +81,47 @@ func main() {
 			return
 		}
 
+	case "dump":
+		if flag.NArg() < 4 {
+			log.Printf("usage: godump dump pool dir fs=name host=name ...")
+			return
+		}
+		pl, err := pool.OpenPool(flag.Arg(1))
+		if err != nil {
+			log.Printf("Error opening pool: %s", err)
+			return
+		}
+		defer pl.Close()
+		path := flag.Arg(2)
+		props, err := encodeProps(flag.Args()[3:])
+		if err != nil {
+			return
+		}
+		err = dump.Run(pl, path, props)
+		if err != nil {
+			log.Printf("Error backing up: %s", err)
+			return
+		}
+
 	default:
 		log.Printf("Unknown subcommand: %s", flag.Arg(0))
 		return
 	}
+}
+
+// Encode the given arguments as properties.
+func encodeProps(args []string) (props map[string]string, err error) {
+	props = make(map[string]string)
+
+	for _, arg := range args {
+		pairs := strings.SplitN(arg, "=", 2)
+		if len(pairs) != 2 {
+			err = errors.New("Argument must be key=val")
+			return
+		}
+		props[pairs[0]] = pairs[1]
+	}
+	return
 }
 
 func mainy() {
