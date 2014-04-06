@@ -11,24 +11,35 @@ import (
 	"syscall"
 	"time"
 
+	"meter"
 	"pool"
 	"store"
 )
 
 type backupState struct {
-	pool pool.Pool
+	srcPool pool.Pool
+	pool    *wrappedPool
 
 	rootDev uint64
+
+	// For the progress meter.
+	lastPath  string
+	fileCount int64
+	dirCount  int64
 }
 
 func Run(pl pool.Pool, path string, props map[string]string) (err error) {
 	log.Printf("Backing up %q", path)
 
 	var self backupState
-	self.pool = pl
+	self.srcPool = pl
+	sync := func() {
+		meter.Sync(&self, false)
+	}
+	self.pool = newWrappedPool(pl, sync)
 
-	self.Backup(path, props)
-
+	err = self.Backup(path, props)
+	meter.Sync(&self, true)
 	return
 }
 
@@ -73,6 +84,15 @@ func (self *backupState) Backup(path string, props map[string]string) (err error
 }
 
 func (self *backupState) directory(dirPath string, dirFi os.FileInfo) (oid *pool.OID, err error) {
+	self.dirCount++
+	oldPath := self.lastPath
+	self.lastPath = dirPath
+	meter.Sync(self, false)
+	defer func() {
+		self.lastPath = oldPath
+		meter.Sync(self, false)
+	}()
+
 	var children []os.FileInfo
 	if dirFi.Sys().(*syscall.Stat_t).Dev == self.rootDev {
 		children, err = Readdir(dirPath)
@@ -126,6 +146,17 @@ func (self *backupState) directory(dirPath string, dirFi os.FileInfo) (oid *pool
 }
 
 func (self *backupState) regularFile(name string, fi os.FileInfo) (oid *pool.OID, err error) {
+	// TODO: This is duplicated here an in directory.  Generalize
+	// this.
+	self.fileCount++
+	oldPath := self.lastPath
+	self.lastPath = name
+	meter.Sync(self, false)
+	defer func() {
+		self.lastPath = oldPath
+		meter.Sync(self, false)
+	}()
+
 	data, err := store.WriteFile(self.pool, name)
 	if err != nil {
 		return
@@ -138,6 +169,8 @@ func (self *backupState) regularFile(name string, fi os.FileInfo) (oid *pool.OID
 }
 
 func (self *backupState) plainNode(name string, fi os.FileInfo) (oid *pool.OID, err error) {
+	self.fileCount++
+	meter.Sync(self, false)
 	props := encodeProps(fi)
 
 	if props.Kind == "LNK" {
@@ -211,4 +244,24 @@ func encodeProps(fi os.FileInfo) (result *store.PropertyMap) {
 
 func isMode(mode uint32, match uint32) bool {
 	return (mode & syscall.S_IFMT) == match
+}
+
+func (self *backupState) GetMeter() (result []string) {
+	result = make([]string, 6)
+
+	result[0] = "----------------------------------------------------------------------"
+	result[1] = fmt.Sprintf("   %11d chunks, %9d files, %9d dirs", self.pool.chunkCount,
+		self.fileCount, self.dirCount)
+	result[2] = fmt.Sprintf("   %s data", meter.Humanize(self.pool.byteCount))
+	result[3] = fmt.Sprintf("   %s zdata (%5.1f%%)", meter.Humanize(self.pool.zbyteCount),
+		100.0*float64(self.pool.zbyteCount)/float64(self.pool.byteCount))
+
+	path := self.lastPath
+	if len(path) > 73 {
+		path = "..." + path[len(path)-60:]
+	}
+	result[4] = fmt.Sprintf(" : %q", path)
+	result[5] = "----------------------------------------------------------------------"
+
+	return result
 }
