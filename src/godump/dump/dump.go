@@ -3,6 +3,7 @@
 package dump
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"fsid"
 	"meter"
 	"pool"
 	"store"
@@ -22,6 +24,9 @@ type backupState struct {
 
 	rootDev uint64
 
+	fsdb   *fsid.Blkid
+	fsUUID string
+
 	// For the progress meter.
 	lastPath  string
 	fileCount int64
@@ -31,8 +36,15 @@ type backupState struct {
 func Run(pl pool.Pool, path string, props map[string]string) (err error) {
 	log.Printf("Backing up %q", path)
 
+	var fsdb fsid.Blkid
+	err = fsdb.Load()
+	if err != nil {
+		return
+	}
+
 	var self backupState
 	self.srcPool = pl
+	self.fsdb = &fsdb
 	sync := func() {
 		meter.Sync(&self, false)
 	}
@@ -53,6 +65,12 @@ func (self *backupState) Backup(path string, props map[string]string) (err error
 
 	// TODO: Get the filesystem UUID here.
 	self.rootDev = rootFi.Sys().(*syscall.Stat_t).Dev
+	var ok bool
+	self.fsUUID, ok = self.fsdb.ByDevId(self.rootDev)
+	if !ok {
+		err = errors.New("Unable to find blkid, try 'blkid' as root, note btrfs is not yet supported")
+		return
+	}
 
 	headId, err := self.directory(path, rootFi)
 	if err != nil {
@@ -68,6 +86,7 @@ func (self *backupState) Backup(path string, props map[string]string) (err error
 	// The backup date property is in 'ms' since the start of unix
 	// time.
 	back.Props["_date"] = strconv.FormatInt(now.UnixNano()/1000000, 10)
+	back.Props["fsuiid"] = self.fsUUID
 
 	id, err := self.writeNode("back", back)
 	if err != nil {
