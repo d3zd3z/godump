@@ -38,6 +38,19 @@ func Run(args []string) (err error) {
 		}
 		err = regen(pl, id)
 
+	case "expire":
+		if len(args) != 1 {
+			err = errors.New("usage: cache expire poolpath")
+			return
+		}
+		var pl pool.Pool
+		pl, err = pool.OpenPool(args[0])
+		if err != nil {
+			return
+		}
+		defer pl.Close()
+		err = expire(pl)
+
 	default:
 		err = errors.New("Unknown cache subcommand, expecting 'list', 'regen'")
 		return

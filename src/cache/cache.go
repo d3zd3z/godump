@@ -2,6 +2,7 @@ package cache
 
 import (
 	"database/sql"
+	"log"
 	"math/rand"
 	"strconv"
 	"time"
@@ -184,6 +185,43 @@ func (self *Cache) GetDir(ino uint64) (di *DirInfo, err error) {
 	}
 
 	di = &dir
+	return
+}
+
+// Run an expiration on the cache in the given database.  Any entries
+// that have expired before the current time will be purged from the
+// database.
+func RunExpire(tx *sql.Tx) (err error) {
+	res, err := tx.Exec(`
+		DELETE FROM ctime_cache
+		WHERE expire < ?`,
+		time.Now().UnixNano())
+	if err != nil {
+		return
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		// Should be supported.
+		return
+	}
+	log.Printf("Purged %d cached files", rows)
+
+	// Remove any stray directories.
+	res, err = tx.Exec(`
+		DELETE from ctime_dirs
+		WHERE pkey NOT IN (
+			SELECT pkey FROM ctime_cache)`)
+	if err != nil {
+		return
+	}
+
+	rows, err = res.RowsAffected()
+	if err != nil {
+		// Should be supported
+		return
+	}
+	log.Printf("Purged %d cached directories", rows)
 	return
 }
 
