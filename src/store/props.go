@@ -132,7 +132,7 @@ func writeString16(buf *bytes.Buffer, text string) {
 func (self *PropertyMap) GetInt(name string) (value int, err error) {
 	text, ok := self.Props[name]
 	if !ok {
-		err = errors.New(fmt.Sprintf("Missing property: %q", name))
+		err = fmt.Errorf("Missing property: %q", name)
 		return
 	}
 	tmp, err := strconv.ParseInt(text, 10, 32)

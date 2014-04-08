@@ -4,7 +4,6 @@ package pool
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"os"
 )
@@ -26,7 +25,7 @@ type Pool interface {
 func OpenPool(base string) (pf Pool, err error) {
 	fi, err := os.Stat(base + "/data.db")
 	if err != nil || !fi.Mode().IsRegular() {
-		err = errors.New(fmt.Sprintf("Does not appear to be pool: '%s'", err))
+		err = fmt.Errorf("Does not appear to be pool: '%s'", err)
 		return
 	}
 

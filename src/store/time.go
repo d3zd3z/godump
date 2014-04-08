@@ -34,7 +34,7 @@ func DecodeTimestamp(text string) (result time.Time, err error) {
 			nsec *= 10
 		}
 	default:
-		err = errors.New(fmt.Sprintf("Invalid timestamp %q", text))
+		err = fmt.Errorf("Invalid timestamp %q", text)
 		return
 	}
 

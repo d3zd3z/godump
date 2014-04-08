@@ -2,7 +2,6 @@ package fsid
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -102,8 +101,7 @@ func (self *Blkid) addLine(line string) (err error) {
 
 	pos := strings.Index(line, ": ")
 	if pos < 0 {
-		msg := fmt.Sprintf("Blkid output has no device name: %q", line)
-		err = errors.New(msg)
+		err = fmt.Errorf("Blkid output has no device name: %q", line)
 		return
 	}
 
@@ -125,13 +123,11 @@ func (self *Blkid) addLine(line string) (err error) {
 		// Grab the key.
 		a := strings.IndexFunc(line, notID)
 		if a < 0 {
-			msg := fmt.Sprintf("blkid: Invalid identifier: %q", line)
-			err = errors.New(msg)
+			err = fmt.Errorf("blkid: Invalid identifier: %q", line)
 			return
 		}
 		if line[a] != '=' {
-			msg := fmt.Sprintf("blkid: Expecting '\n': %q", line)
-			err = errors.New(msg)
+			err = fmt.Errorf("blkid: Expecting '\n': %q", line)
 			return
 		}
 		key := line[:a]
@@ -139,15 +135,13 @@ func (self *Blkid) addLine(line string) (err error) {
 
 		// The value should be a quoted string.
 		if line[0] != '"' {
-			msg := fmt.Sprintf("blkid: Expecting '\"': %q", line)
-			err = errors.New(msg)
+			err = fmt.Errorf("blkid: Expecting '\"': %q", line)
 			return
 		}
 		line = line[1:]
 		b := strings.Index(line, "\" ")
 		if b < 0 {
-			msg := fmt.Sprintf("blkid: Expecting end of quoted string: %q", line)
-			err = errors.New(msg)
+			err = fmt.Errorf("blkid: Expecting end of quoted string: %q", line)
 			return
 		}
 		value := line[:b]

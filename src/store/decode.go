@@ -4,7 +4,6 @@ package store
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -59,7 +58,7 @@ func (self *walker) walk(oid *pool.OID) (err error) {
 		return
 	}
 	if ch == nil {
-		err = errors.New(fmt.Sprintf("Unable to read oid from pool: %q", oid.String()))
+		err = fmt.Errorf("Unable to read oid from pool: %q", oid.String())
 	}
 
 	err = self.visit.Chunk(ch)
@@ -71,7 +70,7 @@ func (self *walker) walk(oid *pool.OID) (err error) {
 	hand, ok := self.handlers[ch.Kind()]
 	if !ok {
 		log.Printf("Unsupported kind %q", ch.Kind().String())
-		// err = errors.New(fmt.Sprintf("Unsupported kind %q", ch.Kind().String()))
+		// err = fmt.Errorf("Unsupported kind %q", ch.Kind().String())
 		return
 	}
 
@@ -87,12 +86,12 @@ func (self *walker) backHandler(chunk pool.Chunk) (err error) {
 	}
 	tDate, ok := pmap.Props["_date"]
 	if !ok {
-		err = errors.New(fmt.Sprintf("Backup record for %q has no _date property", chunk.OID().String()))
+		err = fmt.Errorf("Backup record for %q has no _date property", chunk.OID().String())
 		return
 	}
 	iDate, err := strconv.ParseInt(tDate, 10, 64)
 	if err != nil {
-		err = errors.New(fmt.Sprintf("Invalid _date property %q: %s", tDate, err))
+		err = fmt.Errorf("Invalid _date property %q: %s", tDate, err)
 		return
 	}
 
@@ -109,7 +108,7 @@ func (self *walker) backHandler(chunk pool.Chunk) (err error) {
 
 	hash, ok := pmap.Props["hash"]
 	if !ok {
-		err = errors.New("'hash' property not present in 'back' node")
+		err = fmt.Errorf("'hash' property not present in 'back' node")
 		return
 	}
 	id, err := pool.ParseOID(hash)
