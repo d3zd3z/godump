@@ -26,29 +26,33 @@ func main() {
 	meter.Setup()
 	defer meter.Shutdown()
 
-	if flag.NArg() < 1 {
+	args := flag.Args()
+
+	if len(args) < 1 {
 		flag.PrintDefaults()
 		log.Printf("Must specify subcommand")
 		return
 	}
-	switch flag.Arg(0) {
+	cmd := args[0]
+	args = args[1:]
+	switch cmd {
 	case "create":
-		if flag.NArg() != 2 {
+		if len(args) != 1 {
 			log.Printf("usage: godump create path")
 			return
 		}
-		err := pool.CreateSqlPool(flag.Arg(1))
+		err := pool.CreateSqlPool(args[0])
 		if err != nil {
 			log.Printf("Error creating pool: %s", err)
 			return
 		}
 
 	case "list":
-		if flag.NArg() != 2 {
+		if len(args) != 1 {
 			log.Printf("usage: godump list path")
 			return
 		}
-		pl, err := pool.OpenPool(flag.Arg(1))
+		pl, err := pool.OpenPool(args[0])
 		if err != nil {
 			log.Printf("Error opening pool: %s", err)
 			return
@@ -61,40 +65,40 @@ func main() {
 		}
 
 	case "restore":
-		if flag.NArg() != 4 {
+		if len(args) != 3 {
 			log.Printf("usage: godump restore path hash dir")
 			return
 		}
-		pl, err := pool.OpenPool(flag.Arg(1))
+		pl, err := pool.OpenPool(args[0])
 		if err != nil {
 			log.Printf("Error opening pool: %s", err)
 			return
 		}
 		defer pl.Close()
-		id, err := pool.ParseOID(flag.Arg(2))
+		id, err := pool.ParseOID(args[1])
 		if err != nil {
 			log.Printf("Invalid hash: %s", err)
 			return
 		}
-		err = restore.Run(pl, id, flag.Arg(3))
+		err = restore.Run(pl, id, args[2])
 		if err != nil {
 			log.Printf("Error restoring backup: %s", err)
 			return
 		}
 
 	case "dump":
-		if flag.NArg() < 4 {
+		if len(args) < 3 {
 			log.Printf("usage: godump dump pool dir fs=name host=name ...")
 			return
 		}
-		pl, err := pool.OpenPool(flag.Arg(1))
+		pl, err := pool.OpenPool(args[0])
 		if err != nil {
 			log.Printf("Error opening pool: %s", err)
 			return
 		}
 		defer pl.Close()
-		path := flag.Arg(2)
-		props, err := encodeProps(flag.Args()[3:])
+		path := args[1]
+		props, err := encodeProps(args[2:])
 		if err != nil {
 			return
 		}
@@ -105,7 +109,7 @@ func main() {
 		}
 
 	case "cache":
-		err := cachecmd.Run(flag.Args()[1:])
+		err := cachecmd.Run(args)
 		if err != nil {
 			log.Printf("Error with cache command: %s", err)
 			return
