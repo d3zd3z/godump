@@ -117,6 +117,10 @@ func (self *Cache) UpdateDir(di *DirInfo) (err error) {
 	}
 
 	for _, fi := range di.Files {
+		if fi.Expire.Before(self.BaseTime) {
+			continue
+		}
+
 		_, err = stmt.Exec(pkey, fi.Ino, fi.Expire.UnixNano(), fi.Ctime.UnixNano(), fi.Data[:])
 		if err != nil {
 			return
@@ -165,6 +169,11 @@ func (self *Cache) GetDir(ino uint64) (di *DirInfo, err error) {
 		}
 		var oid pool.OID
 		copy(oid[:], data)
+
+		// Don't add any entries that have expired.
+		if expire.Before(self.BaseTime) {
+			continue
+		}
 
 		file := &FileInfo{
 			Ino:    ino,

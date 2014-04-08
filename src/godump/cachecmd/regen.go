@@ -64,6 +64,10 @@ func (self *regenState) Back(root *pool.OID, date time.Time, props map[string]st
 		return
 	}
 
+	// Base the cache time on the time of the backup, not the
+	// current time.
+	self.cache.BaseTime = date
+
 	return
 }
 
