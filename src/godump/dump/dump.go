@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"cache"
 	"fsid"
 	"meter"
 	"pool"
@@ -26,11 +27,13 @@ type backupState struct {
 
 	fsdb   *fsid.Blkid
 	fsUUID string
+	cache  *cache.Cache
 
 	// For the progress meter.
 	lastPath  string
 	fileCount int64
 	dirCount  int64
+	skipped   int64
 }
 
 func Run(pl pool.Pool, path string, props map[string]string) (err error) {
@@ -63,12 +66,24 @@ func (self *backupState) Backup(path string, props map[string]string) (err error
 		return
 	}
 
-	// TODO: Get the filesystem UUID here.
 	self.rootDev = rootFi.Sys().(*syscall.Stat_t).Dev
 	var ok bool
 	self.fsUUID, ok = self.fsdb.ByDevId(self.rootDev)
 	if !ok {
 		err = errors.New("Unable to find blkid, try 'blkid' as root, note btrfs is not yet supported")
+		return
+	}
+
+	tx := pool.GetSql(self.srcPool)
+	if tx == nil {
+		// TODO: Should this instead just warn, and backup
+		// without the cache?
+		err = errors.New("Pool doesn't contain SQL database, cannot backup to")
+		return
+	}
+
+	self.cache, err = cache.NewCache(tx, self.fsUUID)
+	if err != nil {
 		return
 	}
 
@@ -123,6 +138,14 @@ func (self *backupState) directory(dirPath string, dirFi os.FileInfo) (oid *pool
 		children = make([]os.FileInfo, 0)
 	}
 
+	inode := dirFi.Sys().(*syscall.Stat_t).Ino
+	oldCache, err := self.cache.GetDir(inode)
+	if err != nil {
+		return
+	}
+
+	newCache := cache.NewDirInfo(inode)
+
 	writer := store.NewDirWriter(self.pool, 256*1024)
 
 	for _, child := range children {
@@ -133,7 +156,7 @@ func (self *backupState) directory(dirPath string, dirFi os.FileInfo) (oid *pool
 		// log.Printf("  mode: %o, dir?: %s", mode, isMode(mode, syscall.S_IFDIR))
 		if isMode(mode, syscall.S_IFREG) {
 			// log.Printf("f %s/%s", dirPath, child.Name())
-			id, err = self.regularFile(path.Join(dirPath, child.Name()), child)
+			id, err = self.regularFile(path.Join(dirPath, child.Name()), child, oldCache, newCache)
 		} else if isMode(mode, syscall.S_IFDIR) {
 			// log.Printf("D %s/%s", dirPath, child.Name())
 			id, err = self.directory(path.Join(dirPath, child.Name()), child)
@@ -161,10 +184,16 @@ func (self *backupState) directory(dirPath string, dirFi os.FileInfo) (oid *pool
 	props := encodeProps(dirFi)
 	props.Props["children"] = childId.String()
 
-	return self.writeNode("node", props)
+	oid, err = self.writeNode("node", props)
+	if err != nil {
+		return
+	}
+
+	err = self.cache.UpdateDir(newCache)
+	return
 }
 
-func (self *backupState) regularFile(name string, fi os.FileInfo) (oid *pool.OID, err error) {
+func (self *backupState) regularFile(name string, fi os.FileInfo, oldCache, newCache *cache.DirInfo) (oid *pool.OID, err error) {
 	// TODO: This is duplicated here an in directory.  Generalize
 	// this.
 	self.fileCount++
@@ -176,9 +205,34 @@ func (self *backupState) regularFile(name string, fi os.FileInfo) (oid *pool.OID
 		meter.Sync(self, false)
 	}()
 
-	data, err := store.WriteFile(self.pool, name)
-	if err != nil {
-		return
+	raw := fi.Sys().(*syscall.Stat_t)
+	inode := raw.Ino
+	ctime := time.Unix(raw.Ctim.Sec, raw.Ctim.Nsec)
+	cached, ok := oldCache.Files[inode]
+
+	var data *pool.OID
+	// If the cached value is fine, use it.
+	if ok && cached.Ctime == ctime {
+		// The cached value is fine.
+		newCache.Files[inode] = cached
+		data = cached.Data
+
+		// Record as skipped, since it otherwise will be
+		// uncounted.
+		self.skipped += fi.Size()
+	} else {
+		// Read the data, and generate a new cache entry for
+		// it.
+		data, err = store.WriteFile(self.pool, name)
+		if err != nil {
+			return
+		}
+		newEntry := &cache.FileInfo{
+			Ino:   inode,
+			Ctime: ctime,
+			Data:  data}
+		self.cache.SetExpire(newEntry)
+		newCache.Files[inode] = newEntry
 	}
 
 	props := encodeProps(fi)
@@ -266,21 +320,22 @@ func isMode(mode uint32, match uint32) bool {
 }
 
 func (self *backupState) GetMeter() (result []string) {
-	result = make([]string, 6)
+	result = make([]string, 7)
 
 	result[0] = "----------------------------------------------------------------------"
 	result[1] = fmt.Sprintf("   %11d chunks, %9d files, %9d dirs", self.pool.chunkCount,
 		self.fileCount, self.dirCount)
 	result[2] = fmt.Sprintf("   %s data", meter.Humanize(self.pool.byteCount))
-	result[3] = fmt.Sprintf("   %s zdata (%5.1f%%)", meter.Humanize(self.pool.zbyteCount),
+	result[3] = fmt.Sprintf("   %s skipped", meter.Humanize(self.skipped))
+	result[4] = fmt.Sprintf("   %s zdata (%5.1f%%)", meter.Humanize(self.pool.zbyteCount),
 		100.0*float64(self.pool.zbyteCount)/float64(self.pool.byteCount))
 
 	path := self.lastPath
 	if len(path) > 73 {
 		path = "..." + path[len(path)-60:]
 	}
-	result[4] = fmt.Sprintf(" : %q", path)
-	result[5] = "----------------------------------------------------------------------"
+	result[5] = fmt.Sprintf(" : %q", path)
+	result[6] = "----------------------------------------------------------------------"
 
 	return result
 }
