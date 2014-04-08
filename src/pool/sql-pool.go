@@ -9,7 +9,14 @@ import (
 	"os"
 
 	"code.google.com/p/go-uuid/uuid"
+
+	// Both of these work, but the code.google.com one doesn't
+	// compile with gccgo.  The mattn one does, but only after
+	// renaming sqlite3.c to something else.  gccgo seems to break
+	// if one of the included c files has the same name as the
+	// package.
 	_ "github.com/mattn/go-sqlite3"
+	// _ "code.google.com/p/go-sqlite/go1/sqlite3"
 )
 
 // Construct a fresh new pool in under the given name.  The name must
@@ -207,6 +214,11 @@ func (pool *SqlPool) Contains(oid *OID) (result bool, err error) {
 	return
 }
 
+// Retrieve the tx handle, valid until the next flush.
+func (pool *SqlPool) GetSqlTx() *sql.Tx {
+	return pool.tx
+}
+
 var poolSchema = schema{
 	version: "1:2014-03-18",
 	compats: []schemaCompat{
@@ -230,12 +242,18 @@ var poolSchema = schema{
 			value text)`,
 		`CREATE TABLE filesystems (
 			fsid INTEGER PRIMARY KEY,
-			uuid TEXT)`,
-		`CREATE TABLE ctime_cache (
+			uuid TEXT UNIQUE)`,
+		`CREATE TABLE ctime_dirs (
+			pkey INTEGER PRIMARY KEY,
 			fsid INTEGER REFERENCES filesystems (fsid) NOT NULL,
 			pino INTEGER NOT NULL,
-			expire DOUBLE NOT NULL,
-			info BLOB,
-			PRIMARY KEY (fsid, pino))`,
+			UNIQUE (fsid, pino))`,
+		`CREATE TABLE ctime_cache (
+			pkey INTEGER REFERENCES ctime_dirs (pkey) NOT NULL,
+			ino INTEGER NOT NULL,
+			expire INTEGER NOT NULL,
+			ctime INTEGER NOT NULL,
+			oid blob NOT NULL)`,
+		`CREATE INDEX ctime_cache_pkey ON ctime_cache(pkey)`,
 	},
 }

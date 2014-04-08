@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"godump/cachecmd"
 	"godump/dump"
 	"godump/listing"
 	"godump/restore"
@@ -100,6 +101,13 @@ func main() {
 		err = dump.Run(pl, path, props)
 		if err != nil {
 			log.Printf("Error backing up: %s", err)
+			return
+		}
+
+	case "cache":
+		err := cachecmd.Run(flag.Args()[1:])
+		if err != nil {
+			log.Printf("Error with cache command: %s", err)
 			return
 		}
 

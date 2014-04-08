@@ -86,7 +86,7 @@ func (self *backupState) Backup(path string, props map[string]string) (err error
 	// The backup date property is in 'ms' since the start of unix
 	// time.
 	back.Props["_date"] = strconv.FormatInt(now.UnixNano()/1000000, 10)
-	back.Props["fsuiid"] = self.fsUUID
+	back.Props["fsuuid"] = self.fsUUID
 
 	id, err := self.writeNode("back", back)
 	if err != nil {
