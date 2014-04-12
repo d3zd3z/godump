@@ -1,0 +1,39 @@
+[defaults]
+  pool = "/mnt/grime/a64/pool-2014-03"
+  surelog = "/home/davidb/tar-backup/sure.log"
+  rsynclog = "/home/davidb/tar-backup/rsync.log"
+
+# Path to various executables.
+[commands]
+  cp = "/bin/cp"
+  rsync = "/usr/bin/rsync"
+  rm = "/bin/rm"
+  find = "/usr/bin/find"
+  umount = "/usr/bin/umount"
+  mount = "/bin/mount"
+  lvremove = "/sbin/lvremove"
+  lvcreate = "/sbin/lvcreate"
+  gosure = "/home/davidb/bin/gosure"
+
+[hosts.a64]
+  mirror = "/mnt/mirrors/a64"
+
+    [[hosts.a64.fs]]
+      volume = "boot"
+      base = "/boot"
+      clean = "/boot/clean.sh"
+      style = "plain"
+
+    [[hosts.a64.fs]]
+      vg = "f120"
+      volume = "home"
+      base = "/home"
+      clean = "/home/davidb/tar-backup/clean-home.sh"
+      style = "ext4-lvm"
+
+    [[hosts.a64.fs]]
+      vg = "f120"
+      volume = "fedora"
+      base = "/"
+      clean = "/home/davidb/tar-backup/clean-root.sh"
+      style = "ext4-lvm"

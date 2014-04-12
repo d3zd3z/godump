@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"godump/cachecmd"
+	"godump/config"
 	"godump/dump"
 	"godump/listing"
+	"godump/manager"
 	"godump/restore"
 	"meter"
 )
@@ -21,10 +23,18 @@ func mainz() {
 	pool.IndexMain()
 }
 
+var configFile = flag.String("config", "/etc/godump.toml", "Path to config file")
+
 func main() {
 	flag.Parse()
 	meter.Setup()
 	defer meter.Shutdown()
+
+	config, err := config.LoadConfig(*configFile)
+	if err != nil {
+		log.Printf("config err: %q", err)
+		return
+	}
 
 	args := flag.Args()
 
@@ -113,6 +123,12 @@ func main() {
 		if err != nil {
 			log.Printf("Error with cache command: %s", err)
 			return
+		}
+
+	case "managed":
+		err := manager.Run(config, args)
+		if err != nil {
+			log.Printf("Error running manager: %s", err)
 		}
 
 	default:
